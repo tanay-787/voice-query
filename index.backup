@@ -1,0 +1,476 @@
+import { generateAPIUrl } from '@/utils';
+import { Ionicons } from '@expo/vector-icons';
+import {
+  AudioModule,
+  RecordingPresets,
+  setAudioModeAsync,
+  useAudioPlayer,
+  useAudioRecorder,
+  useAudioRecorderState
+} from 'expo-audio';
+import * as DocumentPicker from 'expo-document-picker';
+import { fetch as expoFetch } from 'expo/fetch';
+import {
+  Avatar,
+  Button,
+  Card,
+  Chip,
+  cn,
+  Divider,
+  Spinner,
+  Surface,
+  TextField
+} from 'heroui-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StatusBar,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { withUniwind } from 'uniwind';
+
+const StyledIonicons = withUniwind(Ionicons);
+
+import { Message } from '@/types/chat';
+import { initializeChatStore, saveChatSession } from '@/storage/chatStore';
+
+const INITIAL_AI_MESSAGE: Message = {
+  id: 'intro',
+  role: 'ai',
+  content: "Hello! I'm your Locked PDF + URL Agent. Start by uploading a document or pasting a URL.",
+};
+
+export default function AIInterfaceScreen() {
+  const [messages, setMessages] = useState<Message[]>([INITIAL_AI_MESSAGE]);
+  const [status, setStatus] = useState<'idle' | 'submitted' | 'streaming' | 'error'>('idle');
+  const [inputValue, setInputValue] = useState('');
+  const [docData, setDocData] = useState<{ summary: string; source: string } | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [ingestUrl, setIngestUrl] = useState('');
+
+  const archiveCurrentChat = useCallback(async () => {
+    if (!docData) return;
+    try {
+      await saveChatSession({
+        source: docData.source,
+        summary: docData.summary,
+        messages,
+      });
+    } catch (error) {
+      console.error('Failed to save chat session', error);
+    }
+  }, [docData, messages]);
+
+  const resetForNewSource = useCallback(async () => {
+    if (isProcessing) return;
+    await archiveCurrentChat();
+    setDocData(null);
+    setMessages([INITIAL_AI_MESSAGE]);
+    setInputValue('');
+    setIngestUrl('');
+    setStatus('idle');
+  }, [archiveCurrentChat, isProcessing]);
+  
+  // Audio State
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(audioRecorder);
+  const player = useAudioPlayer(null);
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    (async () => {
+      const status = await AudioModule.requestRecordingPermissionsAsync();
+      if (!status.granted) {
+        console.warn('Microphone permission not granted');
+      }
+
+      setAudioModeAsync({
+        playsInSilentMode: true,
+        allowsRecording: true,
+      });
+    })();
+  }, []);
+
+  useEffect(() => {
+    initializeChatStore().catch((error) => {
+      console.error('Failed to initialize chat store', error);
+    });
+  }, []);
+
+  // --- Ingestion Handlers ---
+
+  const handlePickPDF = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/pdf',
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+
+      setIsProcessing(true);
+      const file = result.assets[0];
+      const formData = new FormData();
+      formData.append('file', {
+        uri: file.uri,
+        name: file.name,
+        type: 'application/pdf',
+      } as any);
+
+      const response = await fetch(generateAPIUrl('/api/ingest'), {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to process PDF');
+
+      await archiveCurrentChat();
+      setDocData({ summary: data.summary, source: data.source });
+      setMessages([{
+        id: Date.now().toString(),
+        role: 'ai',
+        content: `I've processed the ${data.source}. Here's a summary:\n\n${data.summary}\n\nYou can now ask me questions about it!`
+      }]);
+      setIngestUrl('');
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleProcessURL = async () => {
+    if (!ingestUrl.trim()) return;
+    try {
+      setIsProcessing(true);
+      const response = await fetch(generateAPIUrl('/api/ingest'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: ingestUrl }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to process URL');
+
+      await archiveCurrentChat();
+      setDocData({ summary: data.summary, source: data.source });
+      setMessages([{
+        id: Date.now().toString(),
+        role: 'ai',
+        content: `I've processed the ${data.source}. Here's a summary:\n\n${data.summary}\n\nYou can now ask me questions about it!`
+      }]);
+      setIngestUrl('');
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // --- Conversation Handlers ---
+
+  const sendMessage = async (text: string) => {
+    if (!text.trim()) return;
+    if (!docData) {
+      Alert.alert('Missing Context', 'Please ingest a document first.');
+      return;
+    }
+
+    try {
+      setStatus('submitted');
+      
+      const userMessage = { id: Date.now().toString(), role: 'user' as const, content: text };
+      const currentHistory = [...messages, userMessage];
+      setMessages(currentHistory);
+      setInputValue('');
+
+      setStatus('streaming');
+      const response = await expoFetch(generateAPIUrl('/api/chat'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: text,
+          summary: docData.summary,
+          history: messages.slice(-5) // Send some history
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to get answer');
+
+      const aiMessage = { id: (Date.now() + 1).toString(), role: 'ai' as const, content: data.answer };
+      setMessages(prev => [...prev, aiMessage]);
+
+      if (data.audio) {
+        player.replace({ uri: `data:audio/mp3;base64,${data.audio}` });
+        player.play();
+      }
+      
+      setStatus('idle');
+    } catch (err: any) {
+      console.error(err);
+      setStatus('idle');
+    }
+  };
+
+  // --- Voice Handlers ---
+
+  const startRecording = async () => {
+    try {
+      await audioRecorder.prepareToRecordAsync();
+      audioRecorder.record();
+    } catch (err) {
+      console.error('Failed to start recording', err);
+    }
+  };
+
+  const stopRecording = async () => {
+    try {
+      await audioRecorder.stop();
+      Alert.alert('v1 Limitation', 'Voice-to-text integration is planned for v1.1. Please use the keyboard for now.');
+    } catch (err) {
+      console.error('Failed to stop recording', err);
+    }
+  };
+
+  useEffect(() => {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  }, [messages, status]);
+
+  const renderMessage = (message: Message) => {
+    const isUser = message.role === 'user';
+    return (
+      <View key={message.id} className={cn("flex-row mb-4 max-w-[85%]", isUser ? "self-end justify-end" : "self-start justify-start")}>
+        {!isUser && (
+          <Avatar alt='ai' size="sm" className="mr-2 mt-1">
+            <Avatar.Fallback className="bg-primary">AI</Avatar.Fallback>
+          </Avatar>
+        )}
+        <Card variant={isUser ? "default" : "secondary"} className={cn("rounded-2xl px-4 py-3", isUser ? "bg-primary border-primary" : "bg-surface-secondary")}>
+          <Text className={cn("text-base", isUser ? "text-primary-foreground" : "text-foreground")}>{message.content}</Text>
+        </Card>
+        {isUser && (
+          <Avatar alt='me' size="sm" className="ml-2 mt-1">
+            <Avatar.Fallback className="bg-surface-tertiary">ME</Avatar.Fallback>
+          </Avatar>
+        )}
+      </View>
+    );
+  };
+
+  const constraintChips = ['PDFs <= 20 pages', '~30k characters max', 'Single webpage only'];
+  const isChatReady = Boolean(docData);
+
+  return (
+    <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" />
+
+      <View style={{ flex: 1, backgroundColor: '#f5f5f5' }}>
+        <Surface className="px-4 py-3 border-b border-divider flex-row items-center justify-between z-10">
+          <View className="flex-row items-center gap-3">
+            <Avatar alt="agent" color="accent">
+              <Avatar.Fallback>VA</Avatar.Fallback>
+            </Avatar>
+            <View>
+              <Text className="text-lg font-bold text-foreground">PDF + URL Agent</Text>
+              <Text className="text-xs text-muted">
+                {docData ? `Grounded in ${docData.source}` : 'Awaiting ingestion'}
+              </Text>
+            </View>
+          </View>
+          {isChatReady && (
+            <Button size="sm" variant="ghost" onPress={resetForNewSource} isDisabled={isProcessing}>
+              <Button.Label className="flex-row items-center gap-1">
+                <StyledIonicons name="refresh" size={18} className="text-primary" />
+                New source
+              </Button.Label>
+            </Button>
+          )}
+        </Surface>
+
+        {!isChatReady ? (
+          <ScrollView
+            contentContainerClassName="flex-grow px-4 py-6"
+            showsVerticalScrollIndicator={false}
+          >
+            <Card className="rounded-3xl p-6 bg-white gap-5">
+              <View>
+                <Text className="text-xs uppercase text-muted font-semibold mb-1">Step 1</Text>
+                <Text className="text-2xl font-bold text-foreground mb-2">
+                  Ground the agent with a PDF or URL
+                </Text>
+                <Text className="text-base text-muted">
+                  Upload a small PDF or paste a single webpage. We enforce v1 limits before any processing starts.
+                </Text>
+              </View>
+
+              <View className="gap-4">
+                <Button variant="secondary" onPress={handlePickPDF} isDisabled={isProcessing}>
+                  <StyledIonicons name="document-text" size={20} className="mr-2" />
+                  <Button.Label>{isProcessing ? 'Uploading...' : 'Choose PDF'}</Button.Label>
+                </Button>
+
+                <Divider />
+
+                <TextField>
+                  <TextField.Input
+                    placeholder="https://example.com/article"
+                    value={ingestUrl}
+                    onChangeText={setIngestUrl}
+                    autoCapitalize="none"
+                    className="bg-surface-secondary"
+                  />
+                </TextField>
+
+                <Button
+                  variant="primary"
+                  onPress={handleProcessURL}
+                  isDisabled={isProcessing || !ingestUrl.trim()}
+                >
+                  {isProcessing ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Button.Label>Process URL</Button.Label>
+                  )}
+                </Button>
+              </View>
+
+              <View className="flex-row flex-wrap gap-2">
+                {constraintChips.map((chip) => (
+                  <Chip key={chip} size="sm" variant="soft" color="default">
+                    <Chip.Label className="text-xs font-semibold text-foreground">{chip}</Chip.Label>
+                  </Chip>
+                ))}
+              </View>
+
+              {isProcessing && (
+                <View className="flex-row items-center gap-2">
+                  <Spinner size="sm" color="default" />
+                  <Text className="text-sm text-muted">Processing content...</Text>
+                </View>
+              )}
+            </Card>
+          </ScrollView>
+        ) : (
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+            keyboardVerticalOffset={0}
+          >
+            <View style={{ flex: 1 }}>
+              <ScrollView
+                ref={scrollViewRef}
+                contentContainerClassName="flex-grow bg-background px-4 py-4 pb-8 gap-4"
+                showsVerticalScrollIndicator={false}
+              >
+                {docData && (
+                  <Card className="rounded-3xl p-5 bg-white shadow-sm">
+                    <View className="flex-row items-center justify-between mb-3">
+                      <View>
+                        <Text className="text-xs uppercase text-muted font-semibold">Current source</Text>
+                        <Text className="text-lg font-bold text-foreground capitalize">{docData.source}</Text>
+                      </View>
+                      <Chip size="sm" variant="soft" color="success">
+                        <Chip.Label className="text-xs font-semibold text-foreground">Ready for Q&A</Chip.Label>
+                      </Chip>
+                    </View>
+                    <Divider className="my-4" />
+                    <Text className="text-sm font-semibold text-muted mb-2">Summary</Text>
+                    {docData.summary
+                      .split('\n')
+                      .filter(Boolean)
+                      .map((paragraph, idx) => (
+                        <Text key={`${paragraph}-${idx}`} className="text-base leading-6 text-foreground mb-2">
+                          {paragraph}
+                        </Text>
+                      ))}
+                  </Card>
+                )}
+
+                {messages.map(renderMessage)}
+                {status === 'streaming' && (
+                  <View className="flex-row self-start mb-4 items-center">
+                    <Avatar alt="ai" size="sm" className="mr-2">
+                      <Avatar.Fallback className="bg-primary">AI</Avatar.Fallback>
+                    </Avatar>
+                    <Surface variant="secondary" className="rounded-2xl px-4 py-3 h-12 justify-center">
+                      <Spinner size="sm" color="default" />
+                    </Surface>
+                  </View>
+                )}
+              </ScrollView>
+
+              <Surface className="p-4 border-t border-divider bg-surface">
+                <View className="flex-row gap-3 items-end">
+                  <View className="flex-1">
+                    <TextField>
+                      <TextField.Input
+                        placeholder="Ask about the document..."
+                        value={inputValue}
+                        onChangeText={setInputValue}
+                        multiline
+                        className="max-h-32 bg-surface-secondary border-transparent rounded-2xl pt-3 pb-3"
+                        onSubmitEditing={() => sendMessage(inputValue)}
+                      >
+                        <TextField.InputEndContent className="justify-end pb-1 pr-1">
+                          <Button
+                            variant={inputValue.trim() ? 'primary' : 'secondary'}
+                            isIconOnly
+                            size="sm"
+                            onPress={() => sendMessage(inputValue)}
+                            isDisabled={!inputValue.trim() || status !== 'idle'}
+                            className="rounded-full h-8 w-8"
+                          >
+                            <Button.Label>
+                              <StyledIonicons
+                                name="arrow-up"
+                                size={18}
+                                className={inputValue.trim() ? 'text-primary-foreground' : 'text-muted'}
+                              />
+                            </Button.Label>
+                          </Button>
+                        </TextField.InputEndContent>
+                      </TextField.Input>
+                    </TextField>
+                  </View>
+
+                  <View className="items-center pb-0.5">
+                    <TouchableOpacity
+                      onLongPress={startRecording}
+                      onPressOut={stopRecording}
+                      activeOpacity={0.7}
+                      className={cn(
+                        'size-12 rounded-full items-center justify-center shadow-sm',
+                        recorderState.isRecording ? 'bg-red-500 scale-110' : 'bg-surface-tertiary'
+                      )}
+                    >
+                      <Ionicons
+                        name={recorderState.isRecording ? 'mic' : 'mic-outline'}
+                        size={24}
+                        className={recorderState.isRecording ? 'text-white' : 'text-foreground'}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                {recorderState.isRecording && (
+                  <Text className="text-[10px] text-red-500 mt-1 uppercase font-bold text-center animate-pulse">
+                    Recording... Release to send
+                  </Text>
+                )}
+              </Surface>
+            </View>
+          </KeyboardAvoidingView>
+        )}
+      </View>
+    </SafeAreaView>
+  );
+}
