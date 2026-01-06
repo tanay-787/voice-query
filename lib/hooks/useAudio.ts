@@ -1,0 +1,209 @@
+import { requestAudioPermissions, setupAudioMode, validateRecordingDuration } from '@/lib/services/audio-service';
+import { getGeminiService } from '@/lib/services/gemini';
+import { getTTSService, type TTSOptions } from '@/lib/services/tts-service';
+import {
+  RecordingPresets,
+  useAudioRecorder,
+  useAudioRecorderState,
+} from 'expo-audio';
+import { useCallback, useEffect, useState } from 'react';
+
+/**
+ * Hook for text-to-speech
+ */
+export function useTextToSpeech() {
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  
+  const tts = getTTSService();
+
+  const speak = useCallback(async (text: string, options?: TTSOptions) => {
+    setError(null);
+    setIsSpeaking(true);
+
+    try {
+      await tts.speak(text, options);
+      setTimeout(() => setIsSpeaking(false), 100);
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to speak');
+      setError(error);
+      setIsSpeaking(false);
+      throw error;
+    }
+  }, []);
+
+  const stop = useCallback(async () => {
+    await tts.stop();
+    setIsSpeaking(false);
+  }, []);
+
+  useEffect(() => {
+    const interval: ReturnType<typeof setInterval> = setInterval(() => {
+      const speaking = tts.getSpeakingStatus();
+      setIsSpeaking(speaking);
+    }, 200);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  return {
+    speak,
+    stop,
+    isSpeaking,
+    error,
+  };
+}
+
+/**
+ * Hook for speech-to-text transcription
+ */
+export function useSpeechToText() {
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  
+  const gemini = getGeminiService();
+
+  const transcribe = useCallback(async (audioUri: string): Promise<string> => {
+    setIsTranscribing(true);
+    setError(null);
+
+    try {
+      const transcription = await gemini.transcribeAudio(audioUri);
+      return transcription;
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to transcribe audio');
+      setError(error);
+      throw error;
+    } finally {
+      setIsTranscribing(false);
+    }
+  }, []);
+
+  return {
+    transcribe,
+    isTranscribing,
+    error,
+  };
+}
+
+/**
+ * Hook for complete voice interaction flow
+ * Records audio → Transcribes → Gets answer → Speaks answer
+ */
+export function useVoiceInteraction(contextString: string | null) {
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(recorder);
+  const stt = useSpeechToText();
+  const tts = useTextToSpeech();
+  
+  const [transcription, setTranscription] = useState<string>('');
+  const [answer, setAnswer] = useState<string>('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  
+  const gemini = getGeminiService();
+
+  // Setup permissions and audio mode on mount
+  useEffect(() => {
+    async function setup() {
+      const hasPermission = await requestAudioPermissions();
+      if (hasPermission) {
+        await setupAudioMode();
+      }
+    }
+    setup();
+  }, []);
+
+  const startVoiceQuestion = useCallback(async () => {
+    if (!contextString) {
+      throw new Error('No context available. Please load a document first.');
+    }
+
+    setError(null);
+    setTranscription('');
+    setAnswer('');
+
+    try {
+      console.log('[VoiceInteraction] Starting recording...');
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to start recording');
+      setError(error);
+      throw error;
+    }
+  }, [contextString, recorder]);
+
+  const stopAndProcess = useCallback(async () => {
+    try {
+      setIsProcessing(true);
+
+      // Stop recording
+      console.log('[VoiceInteraction] Stopping recording...');
+      await recorder.stop();
+
+      const uri = recorder.uri;
+      if (!uri) {
+        throw new Error('No recording URI available');
+      }
+
+      // Validate duration
+      const durationMs = recorderState.durationMillis;
+      validateRecordingDuration(durationMs);
+
+      // Transcribe
+      console.log('[VoiceInteraction] Transcribing...');
+      const transcribedText = await stt.transcribe(uri);
+      setTranscription(transcribedText);
+
+      if (!contextString) {
+        throw new Error('No context available');
+      }
+
+      // Get answer
+      console.log('[VoiceInteraction] Getting answer...');
+      const answerText = await gemini.answerQuestion(transcribedText, contextString);
+      setAnswer(answerText);
+
+      // Speak answer
+      console.log('[VoiceInteraction] Speaking answer...');
+      await tts.speak(answerText);
+
+      setIsProcessing(false);
+    } catch (err) {
+      setIsProcessing(false);
+      const error = err instanceof Error ? err : new Error('Processing failed');
+      setError(error);
+      throw error;
+    }
+  }, [contextString, recorder, recorderState, stt, gemini, tts]);
+
+  const cancel = useCallback(async () => {
+    if (recorderState.isRecording) {
+      await recorder.stop();
+    }
+    await tts.stop();
+    setIsProcessing(false);
+    setTranscription('');
+    setAnswer('');
+    setError(null);
+  }, [recorder, recorderState, tts]);
+
+  return {
+    // State
+    isRecording: recorderState.isRecording,
+    isTranscribing: stt.isTranscribing,
+    isSpeaking: tts.isSpeaking,
+    isProcessing,
+    duration: recorderState.durationMillis,
+    transcription,
+    answer,
+    error,
+
+    // Actions
+    startVoiceQuestion,
+    stopAndProcess,
+    cancel,
+    stopSpeaking: tts.stop,
+  };
+}
