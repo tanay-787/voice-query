@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as DocumentPicker from 'expo-document-picker';
 
 /**
  * Test screen for Phase 1 & 2
@@ -51,6 +52,34 @@ export default function TestScreen() {
       addResult(`   ID: 1 (enforced single-context)`);
     } catch (error) {
       addResult(`❌ URL processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const testPDFProcessing = async () => {
+    addResult('🔄 Testing PDF processing...');
+    try {
+      const pickerResult = await DocumentPicker.getDocumentAsync({
+        type: 'application/pdf',
+        copyToCacheDirectory: true,
+      });
+
+      if (pickerResult.canceled) {
+        addResult('ℹ️ PDF selection canceled');
+        return;
+      }
+
+      addResult(`ℹ️ Selected: ${pickerResult.assets[0].name}`);
+      
+      const result = await processor.processPDF(pickerResult);
+      addResult(`✅ PDF processed successfully`);
+      addResult(`   Title: ${result.summary.title}`);
+      addResult(`   Key points: ${result.summary.key_points.length}`);
+      
+      // Save to database
+      const saved = await documentContext.save(result.contextInput);
+      addResult(`✅ Context saved to database`);
+    } catch (error) {
+      addResult(`❌ PDF processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -209,8 +238,14 @@ export default function TestScreen() {
             disabled={!isReady}
           />
           <TestButton
-            title="2. Process URL & Save Context"
+            title="2a. Process URL & Save"
             onPress={testURLProcessing}
+            disabled={!isReady || processor.isProcessing}
+            loading={processor.isProcessing}
+          />
+          <TestButton
+            title="2b. Process PDF & Save"
+            onPress={testPDFProcessing}
             disabled={!isReady || processor.isProcessing}
             loading={processor.isProcessing}
           />

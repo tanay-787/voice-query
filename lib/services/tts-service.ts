@@ -9,6 +9,7 @@ export interface TTSOptions {
   rate?: number; // Speed (0.5 - 2.0)
   pitch?: number; // Pitch (0.5 - 2.0)
   language?: string; // Language code (e.g., 'en-US')
+  voice?: string; // Voice identifier
 }
 
 class TTSService {
@@ -30,6 +31,7 @@ class TTSService {
         rate = 1.0,
         pitch = 1.0,
         language = 'en-US',
+        voice,
       } = options;
 
       this.isSpeaking = true;
@@ -39,6 +41,7 @@ class TTSService {
         language,
         pitch,
         rate,
+        voice, // Pass voice identifier if present
         onDone: () => {
           this.isSpeaking = false;
           console.log('[TTS] Speech completed');

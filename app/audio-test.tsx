@@ -1,15 +1,19 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { AudioWaveform } from '@/components/conversation/AudioWaveform';
+import { TranscriptView } from '@/components/conversation/TranscriptView';
+import { VoiceButton } from '@/components/conversation/VoiceButton';
+import { useVoiceInteraction } from '@/lib/hooks/useAudio';
 import { useDatabase } from '@/lib/hooks/useDatabase';
 import { useDocumentContext } from '@/lib/hooks/useDocumentContext';
-import { useVoiceInteraction } from '@/lib/hooks/useAudio';
-import { VoiceButton } from '@/components/conversation/VoiceButton';
-import { TranscriptView } from '@/components/conversation/TranscriptView';
-import { AudioWaveform } from '@/components/conversation/AudioWaveform';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import * as Speech from 'expo-speech';
+import { StatusBar } from 'expo-status-bar';
+import React, { useEffect, useState } from 'react';
+import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { AzureSpeechConfig } from '@/lib/services/azure-speech';
+import Constants from 'expo-constants';
 
 /**
  * Test screen for Phase 3: Audio Pipeline
@@ -20,6 +24,24 @@ export default function AudioTestScreen() {
   const { db, isReady } = useDatabase();
   const documentContext = useDocumentContext(db);
   const [error, setError] = useState<string>('');
+  
+  // Voice selection state
+  const [voices, setVoices] = useState<Speech.Voice[]>([]);
+  const [selectedVoice, setSelectedVoice] = useState<Speech.Voice | null>(null);
+  const [isVoiceModalVisible, setIsVoiceModalVisible] = useState(false);
+
+  // Retrieve keys from Constants/Env
+  const azureKey = Constants.expoConfig?.extra?.AZURE_SPEECH_SERVICE_KEY || 
+                  process.env.AZURE_SPEECH_SERVICE_KEY;
+  const azureRegion = Constants.expoConfig?.extra?.AZURE_REGION || 
+                     process.env.AZURE_REGION || 
+                     'southeastasia';
+
+  const azureConfig: AzureSpeechConfig = {
+    apiKey: azureKey,
+    region: azureRegion,
+    language: 'en-US'
+  };
 
   // Load context on mount
   React.useEffect(() => {
@@ -29,8 +51,29 @@ export default function AudioTestScreen() {
   }, [isReady]);
 
   const voiceInteraction = useVoiceInteraction(
-    documentContext.context ? documentContext.getPromptContext() : null
+    documentContext.context ? documentContext.getPromptContext() : null,
+    selectedVoice?.identifier,
+    azureConfig
   );
+
+  // Load voices on mount
+  useEffect(() => {
+    const loadVoices = async () => {
+      try {
+        const availableVoices = await voiceInteraction.getVoices();
+        setVoices(availableVoices);
+        // Set default voice if available
+        if (availableVoices.length > 0) {
+          // Prefer English voices
+          const defaultVoice = availableVoices.find(v => v.language.startsWith('en')) || availableVoices[0];
+          setSelectedVoice(defaultVoice);
+        }
+      } catch (err) {
+        console.error('Failed to load voices', err);
+      }
+    };
+    loadVoices();
+  }, []);
 
   const handleStartRecording = async () => {
     setError('');
@@ -67,6 +110,12 @@ export default function AudioTestScreen() {
             {hasContext ? `📄 ${documentContext.context?.title}` : '⚠️ No document loaded'}
           </Text>
         </View>
+        <Pressable 
+          onPress={() => setIsVoiceModalVisible(true)} 
+          style={styles.voiceSelectButton}
+        >
+          <Ionicons name="settings-outline" size={20} color="#111827" />
+        </Pressable>
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
@@ -89,6 +138,12 @@ export default function AudioTestScreen() {
             <Text style={styles.statusLabel}>Recording:</Text>
             <Text style={[styles.statusValue, { color: voiceInteraction.isRecording ? '#ef4444' : '#6b7280' }]}>
               {voiceInteraction.isRecording ? '🔴 Recording' : '⚫ Idle'}
+            </Text>
+          </View>
+          <View style={styles.statusRow}>
+            <Text style={styles.statusLabel}>Voice:</Text>
+            <Text style={[styles.statusValue, { color: '#3b82f6' }]}>
+              {selectedVoice ? selectedVoice.name : 'Default'}
             </Text>
           </View>
         </View>
@@ -153,6 +208,47 @@ export default function AudioTestScreen() {
           </Text>
         )}
       </View>
+
+      {/* Voice Selection Modal */}
+      <Modal
+        visible={isVoiceModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setIsVoiceModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Select Voice</Text>
+            <Pressable onPress={() => setIsVoiceModalVisible(false)}>
+              <Ionicons name="close" size={24} color="#111827" />
+            </Pressable>
+          </View>
+          <FlatList
+            data={voices}
+            keyExtractor={(item) => item.identifier}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[
+                  styles.voiceItem,
+                  selectedVoice?.identifier === item.identifier && styles.voiceItemSelected
+                ]}
+                onPress={() => {
+                  setSelectedVoice(item);
+                  setIsVoiceModalVisible(false);
+                }}
+              >
+                <View>
+                  <Text style={styles.voiceName}>{item.name}</Text>
+                  <Text style={styles.voiceLanguage}>{item.language} • {item.quality}</Text>
+                </View>
+                {selectedVoice?.identifier === item.identifier && (
+                  <Ionicons name="checkmark" size={20} color="#3b82f6" />
+                )}
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -172,6 +268,9 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
     marginRight: 8,
+  },
+  voiceSelectButton: {
+    padding: 8,
   },
   headerContent: {
     flex: 1,
@@ -285,5 +384,43 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6b7280',
     textAlign: 'center',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  voiceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  voiceItemSelected: {
+    backgroundColor: '#eff6ff',
+  },
+  voiceName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  voiceLanguage: {
+    fontSize: 12,
+    color: '#6b7280',
   },
 });

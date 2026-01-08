@@ -1,38 +1,20 @@
-import { File } from 'expo-file-system';
-import * as DocumentPicker from 'expo-document-picker';
-import { validatePDF } from '@/lib/services/validation';
-import { convertURLToMarkdown } from '@/lib/services/url-to-markdown';
-import { getGeminiService } from '@/lib/services/gemini';
-import type { DocumentSummary } from '@/lib/types/context';
-import type { DocumentContextInput } from '@/lib/types/context';
 import { ERROR_MESSAGES } from '@/constants/limits';
+import { getGeminiService } from '@/lib/services/gemini';
+import { convertURLToMarkdown } from '@/lib/services/url-to-markdown';
+import { validatePDF } from '@/lib/services/validation';
+import type { DocumentContextInput, DocumentSummary } from '@/lib/types/context';
+import * as DocumentPicker from 'expo-document-picker';
+import { File } from 'expo-file-system';
 
 /**
  * Document processing orchestrator
  * Handles PDF upload and URL ingestion end-to-end
- * 
- * Note: For v1 MVP, we extract PDF as text. 
- * File API integration will be added in next iteration
  */
 
 export type ProcessingResult = {
   contextInput: DocumentContextInput;
   summary: DocumentSummary;
 };
-
-/**
- * Extract text from PDF (simplified for MVP)
- * TODO: Implement proper Gemini File API integration
- */
-async function extractPDFText(fileUri: string): Promise<string> {
-  // For now, read as base64 using new API and add placeholder
-  // In production, we'd use Gemini File API
-  const file = new File(fileUri);
-  const content = await file.base64();
-  
-  // Placeholder - in reality, Gemini File API will handle this
-  return `[PDF Content - File API integration pending]\n\nNote: This is a simplified MVP. The PDF will be processed properly via Gemini File API in the next iteration.`;
-}
 
 /**
  * Process PDF document
@@ -66,11 +48,17 @@ export async function processPDF(
   const gemini = getGeminiService();
 
   try {
-    // Extract PDF text (simplified for MVP)
-    const text = await extractPDFText(fileUri);
+    // Read PDF as base64
+    const pdfBase64 = await file.base64();
 
-    // Generate summary
-    const summary = await gemini.summarize(text);
+    // Generate summary using Gemini with inline PDF data
+    // This is more efficient and accurate than text extraction
+    const summary = await gemini.summarize({
+      inlineData: {
+        mimeType: 'application/pdf',
+        data: pdfBase64
+      }
+    });
 
     const contextInput: DocumentContextInput = {
       title: summary.title || asset.name || 'PDF Document',

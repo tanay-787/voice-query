@@ -1,0 +1,11 @@
+I'm sorry, but based on the provided knowledge sources, you cannot use `react-native-executorch` in the standard **Expo Go** app.
+
+The knowledge sources explicitly mention that `react-native-executorch` is a bridge to Meta's ExecuTorch runtime and contains native code dependencies [[The future of AI apps is on the device](https://expo.dev/blog/how-to-run-ai-models-with-react-native-executorch)]. Expo Go is a sandbox environment that only supports a fixed set of pre-installed native libraries and cannot run any third-party library that requires custom native code [[What exactly is Expo Go?](https://expo.dev/blog/expo-go-vs-development-builds#what-exactly-is-expo-go); [FAQ](https://docs.expo.dev/faq/#what-can-i-do-or-cannot-do-with-expo-go)].
+
+To use `react-native-executorch`, you must use **Development Builds**:
+
+*   **Custom Native Runtime**: Development builds allow you to include the native code required by ExecuTorch, essentially creating your own customized version of Expo Go [[What exactly is a development build?](https://expo.dev/blog/expo-go-vs-development-builds#what-exactly-is-a-development-build)].
+*   **Installation**: You would install the library using `npx expo install react-native-executorch` and then use [EAS Build](https://expo.dev/eas) or local tools to create a new development build of your app [[Installing libraries with custom native code in development builds](https://docs.expo.dev/workflow/customizing#installing-libraries-with-custom-native-code-in-development-builds)].
+*   **Native Permissions**: AI features like voice transcription often require microphone permissions, which must be configured in your `app.json` and then baked into a development build [[Configuring permissions](https://expo.dev/blog/how-to-run-ai-models-with-react-native-executorch#configuring-permissions)].
+
+The knowledge sources recommend migrating from Expo Go to development builds as soon as your project requires custom native modules like AI inference engines [[A word of encouragement](https://github.com/expo/fyi/blob/main/expo-go-usage.md)].

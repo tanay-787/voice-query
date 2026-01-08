@@ -1,4 +1,5 @@
 import { requestAudioPermissions, setupAudioMode, validateRecordingDuration } from '@/lib/services/audio-service';
+import { AzureSpeechConfig, recognizeSpeech } from '@/lib/services/azure-speech';
 import { getGeminiService } from '@/lib/services/gemini';
 import { getTTSService, type TTSOptions } from '@/lib/services/tts-service';
 import {
@@ -37,6 +38,10 @@ export function useTextToSpeech() {
     setIsSpeaking(false);
   }, []);
 
+  const getVoices = useCallback(async () => {
+    return await tts.getAvailableVoices();
+  }, []);
+
   useEffect(() => {
     const interval: ReturnType<typeof setInterval> = setInterval(() => {
       const speaking = tts.getSpeakingStatus();
@@ -49,27 +54,43 @@ export function useTextToSpeech() {
   return {
     speak,
     stop,
+    getVoices,
     isSpeaking,
     error,
   };
 }
 
 /**
- * Hook for speech-to-text transcription
+ * Hook for speech-to-text transcription (Switched to Azure)
  */
-export function useSpeechToText() {
+export function useSpeechToText(azureConfig: AzureSpeechConfig | null) {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   
-  const gemini = getGeminiService();
+  // const gemini = getGeminiService(); // Replaced with Azure
 
   const transcribe = useCallback(async (audioUri: string): Promise<string> => {
+    if (!azureConfig) {
+      throw new Error('Azure configuration missing');
+    }
+
     setIsTranscribing(true);
     setError(null);
 
     try {
-      const transcription = await gemini.transcribeAudio(audioUri);
-      return transcription;
+      // Use Azure recognizeSpeech instead of Gemini
+      const result = await recognizeSpeech(audioUri, azureConfig);
+      
+      if (!result.DisplayText) {
+         // Sometimes Azure returns "NoMatch" or partial results
+         console.warn('Azure STT Result:', result);
+         if (result.RecognitionStatus === 'NoMatch') {
+             throw new Error('Speech could not be recognized');
+         }
+         throw new Error(`Azure STT failed: ${result.RecognitionStatus || 'Unknown error'}`);
+      }
+      
+      return result.DisplayText;
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to transcribe audio');
       setError(error);
@@ -77,7 +98,7 @@ export function useSpeechToText() {
     } finally {
       setIsTranscribing(false);
     }
-  }, []);
+  }, [azureConfig]);
 
   return {
     transcribe,
@@ -88,12 +109,16 @@ export function useSpeechToText() {
 
 /**
  * Hook for complete voice interaction flow
- * Records audio → Transcribes → Gets answer → Speaks answer
+ * Records audio → Transcribes (Azure) → Gets answer (Gemini) → Speaks answer (Local TTS)
  */
-export function useVoiceInteraction(contextString: string | null) {
+export function useVoiceInteraction(
+  contextString: string | null,
+  voiceIdentifier?: string,
+  azureConfig: AzureSpeechConfig | null = null
+) {
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder);
-  const stt = useSpeechToText();
+  const stt = useSpeechToText(azureConfig);
   const tts = useTextToSpeech();
   
   const [transcription, setTranscription] = useState<string>('');
@@ -118,6 +143,9 @@ export function useVoiceInteraction(contextString: string | null) {
     if (!contextString) {
       throw new Error('No context available. Please load a document first.');
     }
+    if (!azureConfig) {
+      throw new Error('Azure configuration missing');
+    }
 
     setError(null);
     setTranscription('');
@@ -132,7 +160,7 @@ export function useVoiceInteraction(contextString: string | null) {
       setError(error);
       throw error;
     }
-  }, [contextString, recorder]);
+  }, [contextString, recorder, azureConfig]);
 
   const stopAndProcess = useCallback(async () => {
     try {
@@ -152,7 +180,7 @@ export function useVoiceInteraction(contextString: string | null) {
       validateRecordingDuration(durationMs);
 
       // Transcribe
-      console.log('[VoiceInteraction] Transcribing...');
+      console.log('[VoiceInteraction] Transcribing with Azure...');
       const transcribedText = await stt.transcribe(uri);
       setTranscription(transcribedText);
 
@@ -166,8 +194,8 @@ export function useVoiceInteraction(contextString: string | null) {
       setAnswer(answerText);
 
       // Speak answer
-      console.log('[VoiceInteraction] Speaking answer...');
-      await tts.speak(answerText);
+      console.log('[VoiceInteraction] Speaking answer...', voiceIdentifier ? `with voice ${voiceIdentifier}` : 'default voice');
+      await tts.speak(answerText, { voice: voiceIdentifier });
 
       setIsProcessing(false);
     } catch (err) {
@@ -176,7 +204,7 @@ export function useVoiceInteraction(contextString: string | null) {
       setError(error);
       throw error;
     }
-  }, [contextString, recorder, recorderState, stt, gemini, tts]);
+  }, [contextString, recorder, recorderState, stt, gemini, tts, voiceIdentifier]);
 
   const cancel = useCallback(async () => {
     if (recorderState.isRecording) {
@@ -199,8 +227,9 @@ export function useVoiceInteraction(contextString: string | null) {
     transcription,
     answer,
     error,
-
+    
     // Actions
+    getVoices: tts.getVoices, // Expose getVoices directly
     startVoiceQuestion,
     stopAndProcess,
     cancel,

@@ -2,14 +2,13 @@ import { ERROR_MESSAGES } from '@/constants/limits';
 import { QA_SYSTEM_PROMPT, QA_USER_PROMPT, SUMMARIZATION_PROMPT } from '@/constants/prompts';
 import { parseJSONSafely, validateDocumentSummary } from '@/lib/services/validation';
 import type { DocumentSummary } from '@/lib/types/context';
+import { GoogleGenAI, type Part } from '@google/genai';
 import Constants from 'expo-constants';
+import { File } from 'expo-file-system';
 
 /**
  * Gemini AI Service
- * Handles summarization and Q&A using direct API calls
- * 
- * Note: For v1, we'll use direct Gemini REST API for simplicity
- * File API requires different handling which we'll implement incrementally
+ * Handles summarization and Q&A using Google Gen AI SDK
  */
 
 const API_KEY = Constants.expoConfig?.extra?.GOOGLE_GENERATIVE_AI_API_KEY || 
@@ -19,85 +18,47 @@ if (!API_KEY) {
   console.warn('[Gemini] API key not found in config');
 }
 
-const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
-const TIMEOUT_MS = 30000; // 30 seconds
-
 class GeminiService {
-  private model: string = 'gemini-2.5-flash';
-  private apiKey: string;
+  private client: GoogleGenAI;
+  private modelId: string = 'gemma-3-27b-it';
 
   constructor() {
     if (!API_KEY) {
       throw new Error('Google Gemini API key not configured');
     }
-    this.apiKey = API_KEY;
+    this.client = new GoogleGenAI({ apiKey: API_KEY });
   }
 
   /**
-   * Call Gemini API directly with timeout
+   * Summarize content (text or PDF base64)
    */
-  private async callAPI(prompt: string): Promise<string> {
-    const url = `${BASE_URL}/models/${this.model}:generateContent?key=${this.apiKey}`;
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ text: prompt }],
-            },
-          ],
-        }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      
-      if (!data.candidates || data.candidates.length === 0) {
-        throw new Error('No response from Gemini');
-      }
-
-      const text = data.candidates[0].content.parts[0].text;
-      return text;
-    } catch (error) {
-      clearTimeout(timeoutId);
-      
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error('Gemini API timeout. Please try again.');
-      }
-      
-      throw error;
-    }
-  }
-
-  /**
-   * Summarize text content (for now, both PDF and URL will be text)
-   * TODO: Implement File API for PDF upload in next iteration
-   */
-  async summarize(text: string): Promise<DocumentSummary> {
+  async summarize(content: string | Part): Promise<DocumentSummary> {
     try {
       console.log('[Gemini] Generating summary...');
 
-      const prompt = `${text}\n\n${SUMMARIZATION_PROMPT}`;
-      const responseText = await this.callAPI(prompt);
+      const promptPart: Part = { text: SUMMARIZATION_PROMPT };
+      const contentPart: Part = typeof content === 'string' 
+        ? { text: content } 
+        : content;
+
+      const response = await this.client.models.generateContent({
+        model: this.modelId,
+        contents: [
+          {
+            role: 'user',
+            parts: [contentPart, promptPart],
+          },
+        ],
+      });
 
       console.log('[Gemini] Summary generated');
+      
+      const responseText = response.text;
+      if (!responseText) throw new Error('Empty response from Gemini');
 
       // Parse and validate JSON response
-      const summaryData = parseJSONSafely(responseText.trim(), ERROR_MESSAGES.SUMMARY_FAILED);
+      // We still use parseJSONSafely in case the model wraps it in markdown blocks despite mimeType
+      const summaryData = parseJSONSafely(responseText, ERROR_MESSAGES.SUMMARY_FAILED);
       return validateDocumentSummary(summaryData);
     } catch (error) {
       console.error('[Gemini] Summarization failed:', error);
@@ -112,11 +73,22 @@ class GeminiService {
     try {
       console.log('[Gemini] Answering question...');
 
-      const prompt = `${QA_SYSTEM_PROMPT}\n\n${QA_USER_PROMPT(question, contextString)}`;
-      const answer = await this.callAPI(prompt);
+      const response = await this.client.models.generateContent({
+        model: this.modelId,
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: QA_SYSTEM_PROMPT },
+              { text: QA_USER_PROMPT(question, contextString) }
+            ],
+          },
+        ],
+      });
 
       console.log('[Gemini] Answer generated');
-      return answer.trim();
+      const text = response.text;
+      return text ? text.trim() : "I don't know.";
     } catch (error) {
       console.error('[Gemini] Q&A failed:', error);
       throw new Error('Failed to generate answer');
@@ -125,92 +97,59 @@ class GeminiService {
 
   /**
    * Transcribe audio to text (Speech-to-Text)
-   * Uses Gemini's multimodal capabilities
    */
   async transcribeAudio(audioUri: string): Promise<string> {
     try {
       console.log('[Gemini] Transcribing audio...');
 
-      // Read audio file as base64 using new expo-file-system API
-      const { File } = await import('expo-file-system');
+      // Read audio file as base64
       const audioFile = new File(audioUri);
+      if (!audioFile.exists) {
+        throw new Error('Audio file not found');
+      }
       const audioBase64 = await audioFile.base64();
 
-      // Call Gemini with audio data
-      const url = `${BASE_URL}/models/${this.model}:generateContent?key=${this.apiKey}`;
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  inlineData: {
-                    mimeType: 'audio/wav',
-                    data: audioBase64,
-                  },
+      const response = await this.client.models.generateContent({
+        model: this.modelId,
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                inlineData: {
+                  mimeType: 'audio/wav',
+                  data: audioBase64,
                 },
-                {
-                  text: 'Transcribe this audio to text. Return only the transcription, nothing else.',
-                },
-              ],
-            },
-          ],
-        }),
-        signal: controller.signal,
+              },
+              {
+                text: 'Transcribe this audio to text. Return only the transcription, nothing else.',
+              },
+            ],
+          },
+        ],
       });
 
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`Gemini API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      if (!data.candidates || data.candidates.length === 0) {
+      const transcription = response.text?.trim();
+      if (!transcription) {
         throw new Error('No transcription from Gemini');
       }
 
-      const transcription = data.candidates[0].content.parts[0].text.trim();
       console.log('[Gemini] Transcription:', transcription);
-
       return transcription;
     } catch (error) {
       console.error('[Gemini] Transcription failed:', error);
-      
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error('Transcription timeout. Please try again.');
-      }
-      
       throw new Error('Failed to transcribe audio');
     }
   }
 
   /**
    * Convert text to speech (Text-to-Speech)
-   * Note: Gemini doesn't have native TTS, so we'll use a placeholder
-   * In production, use Google Cloud TTS or another service
+   * Placeholder remains as Gemini does not natively support TTS in this SDK yet (or we use a different endpoint)
    */
   async textToSpeech(text: string): Promise<string> {
     try {
-      console.log('[Gemini] Text-to-Speech requested for:', text.substring(0, 50));
-      
-      // TODO: Implement actual TTS service
-      // Options:
-      // 1. Google Cloud Text-to-Speech API
-      // 2. expo-speech (on-device TTS)
-      // 3. Third-party TTS service
-      
-      // For now, return placeholder
-      console.warn('[Gemini] TTS not yet implemented - using placeholder');
+      console.log('[Gemini] Text-to-Speech requested (placeholder)');
+      // For now, return placeholder or throw
       throw new Error('TTS not yet implemented');
     } catch (error) {
       console.error('[Gemini] TTS failed:', error);
