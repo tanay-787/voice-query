@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
-import { StatusBar, Pressable, View, Text } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import React from 'react';
+import { Pressable, StatusBar, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { withUniwind } from 'uniwind';
 
 const StyledIonicons = withUniwind(Ionicons);
@@ -60,12 +60,32 @@ export default function Home() {
               Test Phase 3 (Audio)
             </Text>
           </Pressable>
+
+          <Pressable
+            onPress={() => router.push('/main')}
+            style={({ pressed }) => ({
+              backgroundColor: pressed ? '#2563eb' : '#3b82f6',
+              paddingVertical: 16,
+              paddingHorizontal: 32,
+              borderRadius: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 12,
+            })}
+          >
+            <StyledIonicons name="eye" size={24} color="white" />
+            <Text style={{ color: 'white', fontSize: 18, fontWeight: '600' }}>
+              Test Phase 4
+            </Text>
+          </Pressable>
         </View>
 
         <View style={{ marginTop: 48, padding: 16, backgroundColor: '#f3f4f6', borderRadius: 8 }}>
           <Text style={{ fontSize: 14, color: '#374151', textAlign: 'center' }}>
             Phase 1 & 2: Database, Validation, AI{'\n'}
-            Phase 3: Audio Recording, STT, TTS
+            Phase 3: Audio Recording, STT, TTS{'\n'}
+            Phase 4: Develop UI in Isolation
           </Text>
         </View>
       </View>
