@@ -3,13 +3,10 @@
  * Message input field with send button
  */
 
+import { Button, TextField } from 'heroui-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
-import { Button, TextField } from 'heroui-native';
-import { Ionicons } from '@expo/vector-icons';
-import { withUniwind } from 'uniwind';
-
-const StyledIonicons = withUniwind(Ionicons);
+import { ThemedIcon } from './ThemedIcon';
 
 interface ChatInputProps {
   onSend?: (message: string) => void;
@@ -45,7 +42,7 @@ export function ChatInput({ onSend }: ChatInputProps) {
         onPress={handleSend}
         isDisabled={!message.trim()}
       >
-        <StyledIonicons name="send" size={20} className="text-primary-foreground" />
+        <ThemedIcon name="send" size={20} themeColor="accent-foreground" />
       </Button>
     </View>
   );

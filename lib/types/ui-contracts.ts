@@ -46,7 +46,7 @@ export interface DocumentContextContract {
   error: Error | null;
   
   // Actions
-  loadContext: () => Promise<FormattedContext | null>;
+  loadContext: () => Promise<FormattedContext | null | undefined>;
   save: (input: DocumentContextInput) => Promise<FormattedContext>;
   remove: () => Promise<void>;
   checkExists: () => Promise<boolean>;

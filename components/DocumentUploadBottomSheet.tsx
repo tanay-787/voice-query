@@ -2,13 +2,13 @@
  * DocumentUploadBottomSheet Component
  * BottomSheet with vertically stacked PDF upload and URL input
  * Implements proper keyboard handling for TextField.Input as per HeroUI Native best practices
+ * 
+ * @param documentProcessor - Document processor from useDocumentProcessor hook (type inferred)
+ * @param documentContext - Document context from useDocumentContext hook (type inferred)
  */
 
-import type {
-  DocumentContextContract,
-  DocumentProcessorContract,
-} from '@/lib/types/ui-contracts';
-import { Ionicons } from '@expo/vector-icons';
+import type { useDocumentContext } from '@/lib/hooks/useDocumentContext';
+import type { useDocumentProcessor } from '@/lib/hooks/useDocumentProcessor';
 import { useBottomSheetInternal } from '@gorhom/bottom-sheet';
 import * as DocumentPicker from 'expo-document-picker';
 import {
@@ -24,15 +24,18 @@ import React, { useCallback, useRef, useState } from 'react';
 import { findNodeHandle, Text, TextInput, View, type BlurEvent, type FocusEvent } from 'react-native';
 import Animated, { FadeInDown, FadeOutUp, LinearTransition } from 'react-native-reanimated';
 import { withUniwind } from 'uniwind';
+import { ThemedIcon } from './ThemedIcon';
 
 const StyledText = withUniwind(Text);
-const StyledIonicons = withUniwind(Ionicons);
 const AnimatedView = withUniwind(Animated.View);
 
 /**
  * URLTextField Component
  * TextField.Input with custom keyboard handling for BottomSheet
  * Must be rendered inside BottomSheet.Content to use useBottomSheetInternal
+ * 
+ * Implements the pattern from HeroUI Native docs for TextField with prefix text.
+ * Uses absolute positioning for the "https://" prefix.
  */
 interface URLTextFieldProps {
   url: string;
@@ -44,10 +47,15 @@ interface URLTextFieldProps {
 
 function URLTextField({ url, onChangeText, isDisabled, hasError, errorMessage }: URLTextFieldProps) {
   const inputRef = useRef<TextInput>(null);
+  
+  // Keyboard handling hooks from @gorhom/bottom-sheet
+  // These communicate focus state to the BottomSheet for proper keyboard avoidance
   const { animatedKeyboardState, textInputNodesRef } = useBottomSheetInternal();
 
   const handleOnFocus = useCallback(
     (e: FocusEvent) => {
+      // Notify BottomSheet that this input is focused
+      // This allows the sheet to extend properly when keyboard appears
       animatedKeyboardState.set((state) => ({
         ...state,
         target: e.nativeEvent.target,
@@ -58,6 +66,8 @@ function URLTextField({ url, onChangeText, isDisabled, hasError, errorMessage }:
 
   const handleOnBlur = useCallback(
     (e: BlurEvent) => {
+      // Notify BottomSheet that focus is lost
+      // Check if another input in the sheet is being focused before clearing
       const keyboardState = animatedKeyboardState.get();
       const currentFocusedInput = findNodeHandle(
         TextInput.State.currentlyFocusedInput() as TextInput | null
@@ -85,7 +95,6 @@ function URLTextField({ url, onChangeText, isDisabled, hasError, errorMessage }:
         <TextField.Input
           ref={inputRef}
           className="flex-1 pl-[60px]"
-          placeholder="example.com"
           value={url}
           onChangeText={onChangeText}
           keyboardType="url"
@@ -111,8 +120,9 @@ function URLTextField({ url, onChangeText, isDisabled, hasError, errorMessage }:
 interface DocumentUploadBottomSheetProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  documentProcessor: DocumentProcessorContract;
-  documentContext: DocumentContextContract;
+  // Type inferred from hook return types - follows pattern from test.tsx and audio-test.tsx
+  documentProcessor: ReturnType<typeof useDocumentProcessor>;
+  documentContext: ReturnType<typeof useDocumentContext>;
 }
     
 export function DocumentUploadBottomSheet({
@@ -244,39 +254,27 @@ export function DocumentUploadBottomSheet({
                   onPress={handlePickPDF}
                   isDisabled={documentProcessor.isProcessing}
                 >
-                  <StyledIonicons
-                    name="document-outline"
-                    size={20}
-                    className="text-secondary-foreground mr-2"
-                  />
-                  <Button.Label>Choose PDF File</Button.Label>
+                  <Button.Label>Choose a File</Button.Label>
                 </Button>
 
                 {/* Show selected file */}
                 {selectedFile && (
                   <Card variant="secondary">
-                    <Card.Body className="flex-row items-center justify-between p-3">
+                    <Card.Title className='text-muted text-base pl-2'>Selected File:</Card.Title>
+                    <Card.Body className="flex-row items-center justify-between p-2">
                       <View className="flex-row items-center gap-2 flex-1">
-                        <StyledIonicons
-                          name="document-text"
-                          size={20}
-                          className="text-secondary-foreground"
-                        />
-                        <StyledText className="text-sm flex-1" numberOfLines={1}>
+                        <ThemedIcon name="document-text" size={20} themeColor="accent-soft-foreground" />
+                        <StyledText className="text-sm flex-1 text-foreground" numberOfLines={1}>
                           {selectedFile.name}
                         </StyledText>
                       </View>
                       <Button
                         variant="ghost"
-                        size="sm"
+                        isIconOnly
                         onPress={handleClearFile}
                         isDisabled={documentProcessor.isProcessing}
                       >
-                        <StyledIonicons
-                          name="close-circle"
-                          size={20}
-                          className="text-muted"
-                        />
+                        <ThemedIcon name="close-circle" size={20} themeColor="muted" />
                       </Button>
                     </Card.Body>
                   </Card>
@@ -328,24 +326,15 @@ export function DocumentUploadBottomSheet({
               onPress={handleProcess}
               isDisabled={!hasValidInput || documentProcessor.isProcessing}
             >
+              {documentProcessor.isProcessing ?(
+                <Spinner size="lg">
+                  <Spinner.Indicator />
+                </Spinner>
+              ) : null }
               <Button.Label>
-                {documentProcessor.isProcessing ? 'Processing...' : 'Process'}
+                {documentProcessor.isProcessing ? 'Retrieving Context...' : 'Proceed to Chat'}
               </Button.Label>
             </Button>
-
-            {/* Processing Indicator */}
-            {documentProcessor.isProcessing && (
-              <Card variant="secondary">
-                <Card.Body className="items-center p-6 gap-3">
-                  <Spinner size="lg">
-                    <Spinner.Indicator />
-                  </Spinner>
-                  <StyledText className="text-sm text-muted">
-                    Processing document...
-                  </StyledText>
-                </Card.Body>
-              </Card>
-            )}
           </View>
         </BottomSheet.Content>
       </BottomSheet.Portal>

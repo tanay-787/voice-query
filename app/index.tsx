@@ -1,7 +1,7 @@
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Pressable, StatusBar, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { withUniwind } from 'uniwind';
 
@@ -12,7 +12,6 @@ export default function Home() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" />
       
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
         <Text style={{ fontSize: 28, fontWeight: 'bold', marginBottom: 8 }}>

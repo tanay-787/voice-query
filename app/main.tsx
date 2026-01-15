@@ -10,7 +10,7 @@
  */
 
 import { Stack } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { withUniwind } from 'uniwind';
 
@@ -23,41 +23,60 @@ import {
   EmptyState,
 } from '@/components';
 
-// Mock implementations (swap with real hooks in production)
-import {
-  createMockDatabase,
-  createMockDocumentContext,
-  createMockDocumentProcessor,
-  createMockVoiceInteraction,
-} from '@/lib/types/mock-factory';
+// Business Layer Hooks
+import { useDatabase } from '@/lib/hooks/useDatabase';
+import { useDocumentContext } from '@/lib/hooks/useDocumentContext';
+import { useDocumentProcessor } from '@/lib/hooks/useDocumentProcessor';
 
 const StyledText = withUniwind(Text);
 
 export default function MainScreen() {
   // ========================================================================
-  // BUSINESS LAYER - Replace with real hooks in production
+  // BUSINESS LAYER - Real hooks
   // ========================================================================
   
-  // Production:
-  // const database = useDatabase();
-  // const documentContext = useDocumentContext(database.db);
-  // const documentProcessor = useDocumentProcessor();
-  // const voiceInteraction = useVoiceInteraction(
-  //   documentContext.getPromptContext(),
-  //   undefined,
-  //   azureConfig
-  // );
+  const database = useDatabase();
+  const documentContext = useDocumentContext(database.db);
+  const documentProcessor = useDocumentProcessor();
+
+  // ========================================================================
+  // CONTEXT LOADING & LIFECYCLE
+  // ========================================================================
   
-  const database = createMockDatabase('success');
-  const documentContext = createMockDocumentContext('idle'); // Start with no document
-  const documentProcessor = createMockDocumentProcessor('idle');
-  const voiceInteraction = createMockVoiceInteraction('idle');
+  // Load existing context from SQLite on mount
+  useEffect(() => {
+    if (database.isReady) {
+      documentContext.loadContext();
+    }
+  }, [database.isReady]);
 
   // ========================================================================
   // LOCAL STATE
   // ========================================================================
   
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+
+  // ========================================================================
+  // HANDLERS
+  // ========================================================================
+  
+  /**
+   * Handle document replacement flow
+   * 1. Delete existing context from database
+   * 2. Open upload bottom sheet for new document
+   */
+  const handleChangeDocument = async () => {
+    try {
+      // Remove current context from database
+      await documentContext.remove();
+      // Open upload sheet for new document
+      setIsUploadOpen(true);
+    } catch (error) {
+      console.error('[MainScreen] Failed to remove context:', error);
+      // Still open upload sheet even if delete fails
+      setIsUploadOpen(true);
+    }
+  };
 
   // ========================================================================
   // MAIN RENDER
@@ -68,7 +87,12 @@ export default function MainScreen() {
       {/* Custom Header via Stack.Screen */}
       <Stack.Screen
         options={{
-          header: () => <CustomHeader documentContext={documentContext} />,
+          header: () => (
+            <CustomHeader 
+              documentContext={documentContext}
+              onChangeDocument={handleChangeDocument}
+            />
+          ),
         }}
       />
 
