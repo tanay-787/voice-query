@@ -10,11 +10,18 @@
  */
 
 import { Stack } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { withUniwind } from 'uniwind';
 
-// Business Layer Contracts
+// Components
+import {
+  ChatInput,
+  CustomHeader,
+  DocumentUploadBottomSheet,
+  DocumentUploadTrigger,
+  EmptyState,
+} from '@/components';
 
 // Mock implementations (swap with real hooks in production)
 import {
@@ -24,7 +31,6 @@ import {
   createMockVoiceInteraction,
 } from '@/lib/types/mock-factory';
 
-// Styled components
 const StyledText = withUniwind(Text);
 
 export default function MainScreen() {
@@ -43,9 +49,15 @@ export default function MainScreen() {
   // );
   
   const database = createMockDatabase('success');
-  const documentContext = createMockDocumentContext('success');
+  const documentContext = createMockDocumentContext('idle'); // Start with no document
   const documentProcessor = createMockDocumentProcessor('idle');
   const voiceInteraction = createMockVoiceInteraction('idle');
+
+  // ========================================================================
+  // LOCAL STATE
+  // ========================================================================
+  
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
 
   // ========================================================================
   // MAIN RENDER
@@ -68,44 +80,33 @@ export default function MainScreen() {
           className="flex-1"
           contentContainerClassName="p-4 gap-4"
         >
-          <StyledText className="text-sm text-muted">
-            Chat messages will appear here...
-          </StyledText>
+          {!documentContext.context ? (
+            <EmptyState />
+          ) : (
+            <StyledText className="text-sm text-muted">
+              Chat messages will appear here...
+            </StyledText>
+          )}
         </ScrollView>
 
-        {/* Fixed Input at Bottom */}
+        {/* Conditional Bottom Input Area */}
         <View className="border-t border-border p-4 pb-safe-offset-3">
-          <StyledText className="text-sm text-muted">
-            Input component will be mounted here...
-          </StyledText>
+          {!documentContext.context ? (
+            <DocumentUploadTrigger onPress={() => setIsUploadOpen(true)} />
+          ) : (
+            <ChatInput />
+          )}
         </View>
 
       </View>
+
+      {/* Document Upload BottomSheet */}
+      <DocumentUploadBottomSheet
+        isOpen={isUploadOpen}
+        onOpenChange={setIsUploadOpen}
+        documentProcessor={documentProcessor}
+        documentContext={documentContext}
+      />
     </>
-  );
-}
-
-// ============================================================================
-// CUSTOM HEADER COMPONENT
-// ============================================================================
-
-interface CustomHeaderProps {
-  documentContext: any; // Replace with DocumentContextContract
-}
-
-function CustomHeader({ documentContext }: CustomHeaderProps) {
-  return (
-    <View className="bg-background border-b border-border pt-safe-offset-3">
-      <View className="px-4 py-3">
-        <StyledText className="text-xl font-bold text-foreground">
-          Document AI Assistant
-        </StyledText>
-        {documentContext.context && (
-          <StyledText className="text-xs text-muted mt-1" numberOfLines={1}>
-            {documentContext.context.source === 'pdf' ? '📄' : '🌐'} {documentContext.context.title}
-          </StyledText>
-        )}
-      </View>
-    </View>
   );
 }

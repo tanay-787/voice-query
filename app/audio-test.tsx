@@ -1,6 +1,6 @@
-import { AudioWaveform } from '@/components/conversation/AudioWaveform';
-import { TranscriptView } from '@/components/conversation/TranscriptView';
-import { VoiceButton } from '@/components/conversation/VoiceButton';
+import { AudioWaveform } from '@/components/testing/conversation/AudioWaveform';
+import { TranscriptView } from '@/components/testing/conversation/TranscriptView';
+import { VoiceButton } from '@/components/testing/conversation/VoiceButton';
 import { useVoiceInteraction } from '@/lib/hooks/useAudio';
 import { useDatabase } from '@/lib/hooks/useDatabase';
 import { useDocumentContext } from '@/lib/hooks/useDocumentContext';
