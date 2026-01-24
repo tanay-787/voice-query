@@ -10,3 +10,16 @@ export { EmptyState } from './EmptyState';
 export { ThemedIcon, ThemedIconVariants } from './ThemedIcon';
 export type { ThemedIconProps } from './ThemedIcon';
 
+// Voice Input Components
+export { 
+  VoiceInputArea,
+  VoiceButton,
+  TranscriptCard,
+  AudioWaveform,
+  type VoiceButtonState,
+} from './voice';
+
+// Chat Components
+export { ChatMessageList, MessageBubble } from './chat';
+
+

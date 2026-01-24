@@ -9,6 +9,7 @@
 
 import type { useDocumentContext } from '@/lib/hooks/useDocumentContext';
 import type { useDocumentProcessor } from '@/lib/hooks/useDocumentProcessor';
+import { ErrorType, useErrorHandler } from '@/lib/hooks/useErrorHandler';
 import { useBottomSheetInternal } from '@gorhom/bottom-sheet';
 import * as DocumentPicker from 'expo-document-picker';
 import {
@@ -133,6 +134,8 @@ export function DocumentUploadBottomSheet({
 }: DocumentUploadBottomSheetProps) {
   const [url, setUrl] = useState('');
   const [selectedFile, setSelectedFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+  const { showError, showSuccess } = useErrorHandler();
+
 
   // Validate URL format - now expects input WITHOUT https://
   const isValidUrl = (urlString: string): boolean => {
@@ -170,7 +173,7 @@ export function DocumentUploadBottomSheet({
         setUrl('');
       }
     } catch (error) {
-      console.error('PDF picker error:', error);
+      showError(ErrorType.DOCUMENT_UPLOAD_FAILED, error);
     }
   };
 
@@ -201,10 +204,12 @@ export function DocumentUploadBottomSheet({
         };
         const processResult = await documentProcessor.processPDF(pickerResult);
         await documentContext.save(processResult.contextInput);
+        showSuccess('Document Processed', 'PDF has been successfully analyzed');
       } else if (hasValidUrl) {
         // Process URL
         const result = await documentProcessor.processURL(url);
         await documentContext.save(result.contextInput);
+        showSuccess('Document Processed', 'URL content has been successfully analyzed');
       }
 
       // Reset and close on success
@@ -212,7 +217,11 @@ export function DocumentUploadBottomSheet({
       setSelectedFile(null);
       onOpenChange(false);
     } catch (error) {
-      console.error('Processing error:', error);
+      showError(
+        ErrorType.DOCUMENT_PROCESSING_FAILED,
+        error,
+        () => handleProcess() // Retry callback
+      );
     }
   };
 

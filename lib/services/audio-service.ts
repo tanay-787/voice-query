@@ -56,8 +56,19 @@ export async function setupAudioMode(): Promise<void> {
 
 /**
  * Validate recording duration
+ * Minimum: 300ms to avoid accidental button taps
+ * Maximum: 60 seconds
+ * 
+ * Note: This catches extremely short accidental taps.
+ * Azure STT will further validate if actual speech was detected (vs silence/noise).
  */
 export function validateRecordingDuration(durationMs: number): void {
+  const MIN_DURATION_MS = 300; // Reduced from 500ms - Azure handles speech detection
+  
+  if (durationMs < MIN_DURATION_MS) {
+    throw new Error(`Recording too short (${durationMs}ms). Please hold the button and speak your question.`);
+  }
+  
   if (durationMs > LIMITS.AUDIO_MAX_DURATION_MS) {
     throw new Error('Recording too long (max 60 seconds)');
   }

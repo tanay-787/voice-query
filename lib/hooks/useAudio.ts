@@ -78,16 +78,23 @@ export function useSpeechToText(azureConfig: AzureSpeechConfig | null) {
     setError(null);
 
     try {
-      // Use Azure recognizeSpeech instead of Gemini
       const result = await recognizeSpeech(audioUri, azureConfig);
       
-      if (!result.DisplayText) {
-         // Sometimes Azure returns "NoMatch" or partial results
-         console.warn('Azure STT Result:', result);
-         if (result.RecognitionStatus === 'NoMatch') {
-             throw new Error('Speech could not be recognized');
-         }
-         throw new Error(`Azure STT failed: ${result.RecognitionStatus || 'Unknown error'}`);
+      console.log('[STT] Azure result:', result);
+      
+      // Check if no phrases detected (user was silent or background noise only)
+      if (!result.phrases || result.phrases.length === 0) {
+        throw new Error('No speech detected. Please speak clearly and try again.');
+      }
+      
+      // Check if DisplayText is empty (no recognizable speech)
+      if (!result.DisplayText || result.DisplayText.trim() === '') {
+        throw new Error('No speech detected. Please speak clearly and try again.');
+      }
+      
+      // Check for NoMatch status
+      if (result.RecognitionStatus === 'NoMatch') {
+        throw new Error('Speech could not be recognized. Please speak more clearly.');
       }
       
       return result.DisplayText;
@@ -175,11 +182,11 @@ export function useVoiceInteraction(
         throw new Error('No recording URI available');
       }
 
-      // Validate duration
+      // Validate duration (catches extremely short accidental taps)
       const durationMs = recorderState.durationMillis;
       validateRecordingDuration(durationMs);
 
-      // Transcribe
+      // Transcribe (Azure will validate if actual speech was detected)
       console.log('[VoiceInteraction] Transcribing with Azure...');
       const transcribedText = await stt.transcribe(uri);
       setTranscription(transcribedText);
