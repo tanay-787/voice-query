@@ -1,4 +1,4 @@
-import { useDatabase } from '@/lib/hooks/useDatabase';
+import { useSQLiteContext } from 'expo-sqlite';
 import { useDocumentContext } from '@/lib/hooks/useDocumentContext';
 import { useDocumentProcessor } from '@/lib/hooks/useDocumentProcessor';
 import { StatusBar } from 'expo-status-bar';
@@ -12,7 +12,7 @@ import * as DocumentPicker from 'expo-document-picker';
  * Tests database, document processing, and AI integration
  */
 export default function TestScreen() {
-  const { db, isReady, error: dbError } = useDatabase();
+  const db = useSQLiteContext(); // Database is guaranteed to be ready
   const documentContext = useDocumentContext(db);
   const processor = useDocumentProcessor();
   
@@ -22,17 +22,9 @@ export default function TestScreen() {
   const [answer, setAnswer] = useState<string>('');
 
   useEffect(() => {
-    if (isReady) {
-      addResult('✅ Database initialized successfully');
-      documentContext.loadContext();
-    }
-  }, [isReady]);
-
-  useEffect(() => {
-    if (dbError) {
-      addResult(`❌ Database error: ${dbError.message}`);
-    }
-  }, [dbError]);
+    addResult('✅ Database initialized successfully');
+    documentContext.loadContext();
+  }, []);
 
   const addResult = (message: string) => {
     setTestResults(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
@@ -189,7 +181,7 @@ export default function TestScreen() {
       <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' }}>
         <Text style={{ fontSize: 20, fontWeight: 'bold' }}>Phase 1 & 2 Test Suite</Text>
         <Text style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
-          Database: {isReady ? '✅ Ready' : '⏳ Initializing...'}
+          Database: ✅ Ready
         </Text>
       </View>
 
@@ -235,36 +227,35 @@ export default function TestScreen() {
           <TestButton
             title="1. Test Validation Logic"
             onPress={testValidation}
-            disabled={!isReady}
           />
           <TestButton
             title="2a. Process URL & Save"
             onPress={testURLProcessing}
-            disabled={!isReady || processor.isProcessing}
+            disabled={processor.isProcessing}
             loading={processor.isProcessing}
           />
           <TestButton
             title="2b. Process PDF & Save"
             onPress={testPDFProcessing}
-            disabled={!isReady || processor.isProcessing}
+            disabled={processor.isProcessing}
             loading={processor.isProcessing}
           />
           <TestButton
             title="3. Load Context from DB"
             onPress={testContextRetrieval}
-            disabled={!isReady || documentContext.isLoading}
+            disabled={documentContext.isLoading}
             loading={documentContext.isLoading}
           />
           <TestButton
             title="4. Ask Question (Q&A)"
             onPress={testQuestion_A}
-            disabled={!isReady || processor.isProcessing || !documentContext.context}
+            disabled={processor.isProcessing || !documentContext.context}
             loading={processor.isProcessing}
           />
           <TestButton
             title="🗑️ Delete Context"
             onPress={deleteContext}
-            disabled={!isReady || documentContext.isLoading}
+            disabled={documentContext.isLoading}
             color="#dc2626"
           />
           <TestButton

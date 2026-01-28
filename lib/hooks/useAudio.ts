@@ -1,6 +1,6 @@
+import { getAgentService } from '@/lib/services/agent';
 import { requestAudioPermissions, setupAudioMode, validateRecordingDuration } from '@/lib/services/audio-service';
 import { AzureSpeechConfig, recognizeSpeech } from '@/lib/services/azure-speech';
-import { getGeminiService } from '@/lib/services/gemini';
 import { getTTSService, type TTSOptions } from '@/lib/services/tts-service';
 import {
   RecordingPresets,
@@ -61,13 +61,11 @@ export function useTextToSpeech() {
 }
 
 /**
- * Hook for speech-to-text transcription (Switched to Azure)
+ * Hook for speech-to-text transcription (Azure)
  */
 export function useSpeechToText(azureConfig: AzureSpeechConfig | null) {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  
-  // const gemini = getGeminiService(); // Replaced with Azure
 
   const transcribe = useCallback(async (audioUri: string): Promise<string> => {
     if (!azureConfig) {
@@ -133,7 +131,7 @@ export function useVoiceInteraction(
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   
-  const gemini = getGeminiService();
+  const agent = getAgentService();
 
   // Setup permissions and audio mode on mount
   useEffect(() => {
@@ -197,7 +195,7 @@ export function useVoiceInteraction(
 
       // Get answer
       console.log('[VoiceInteraction] Getting answer...');
-      const answerText = await gemini.answerQuestion(transcribedText, contextString);
+      const answerText = await agent.answerQuestion(transcribedText, contextString);
       setAnswer(answerText);
 
       // Speak answer
@@ -211,7 +209,7 @@ export function useVoiceInteraction(
       setError(error);
       throw error;
     }
-  }, [contextString, recorder, recorderState, stt, gemini, tts, voiceIdentifier]);
+  }, [contextString, recorder, recorderState, stt, agent, tts, voiceIdentifier]);
 
   const cancel = useCallback(async () => {
     if (recorderState.isRecording) {

@@ -37,21 +37,24 @@ export async function saveContext(
   try {
     const now = Date.now();
 
-    await db.runAsync(
-      `INSERT OR REPLACE INTO document_context 
-       (id, title, source, source_uri, overview, key_points, definitions, created_at, updated_at)
-       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        input.title,
-        input.source,
-        input.source_uri ?? null,
-        input.overview,
-        JSON.stringify(input.key_points),
-        JSON.stringify(input.definitions),
-        now,
-        now,
-      ]
-    );
+    // Use transaction for atomicity
+    await db.withTransactionAsync(async () => {
+      await db.runAsync(
+        `INSERT OR REPLACE INTO document_context 
+         (id, title, source, source_uri, overview, key_points, definitions, created_at, updated_at)
+         VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          input.title,
+          input.source,
+          input.source_uri ?? null,
+          input.overview,
+          JSON.stringify(input.key_points),
+          JSON.stringify(input.definitions),
+          now,
+          now,
+        ]
+      );
+    });
 
     const saved = await getContext(db);
     if (!saved) {

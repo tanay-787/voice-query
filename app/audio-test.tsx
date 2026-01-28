@@ -2,7 +2,7 @@ import { AudioWaveform } from '@/components/testing/conversation/AudioWaveform';
 import { TranscriptView } from '@/components/testing/conversation/TranscriptView';
 import { VoiceButton } from '@/components/testing/conversation/VoiceButton';
 import { useVoiceInteraction } from '@/lib/hooks/useAudio';
-import { useDatabase } from '@/lib/hooks/useDatabase';
+import { useSQLiteContext } from 'expo-sqlite';
 import { useDocumentContext } from '@/lib/hooks/useDocumentContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -21,7 +21,7 @@ import Constants from 'expo-constants';
  */
 export default function AudioTestScreen() {
   const router = useRouter();
-  const { db, isReady } = useDatabase();
+  const db = useSQLiteContext(); // Database is guaranteed to be ready
   const documentContext = useDocumentContext(db);
   const [error, setError] = useState<string>('');
   
@@ -44,11 +44,9 @@ export default function AudioTestScreen() {
   };
 
   // Load context on mount
-  React.useEffect(() => {
-    if (isReady) {
-      documentContext.loadContext();
-    }
-  }, [isReady]);
+  useEffect(() => {
+    documentContext.loadContext();
+  }, []);
 
   const voiceInteraction = useVoiceInteraction(
     documentContext.context ? documentContext.getPromptContext() : null,

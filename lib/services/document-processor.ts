@@ -1,6 +1,6 @@
 import { ERROR_MESSAGES } from '@/constants/limits';
+import { getAgentService } from '@/lib/services/agent';
 import { getGeminiService } from '@/lib/services/gemini';
-import { getPhi4Service } from '@/lib/services/phi4';
 import { convertURLToMarkdown } from '@/lib/services/url-to-markdown';
 import { validatePDF } from '@/lib/services/validation';
 import type { DocumentContextInput, DocumentSummary } from '@/lib/types/context';
@@ -88,8 +88,8 @@ export async function processURL(url: string): Promise<ProcessingResult> {
     const { markdown, title: urlTitle } = await convertURLToMarkdown(url);
 
     // Generate summary from markdown
-    const phi4 = getPhi4Service();
-    const summary = await phi4.summarize(markdown);
+    const agent = getAgentService();
+    const summary = await agent.summarize(markdown);
 
     const contextInput: DocumentContextInput = {
       title: summary.title || urlTitle || 'Web Page',
@@ -118,6 +118,6 @@ export async function askQuestion(
     throw new Error(ERROR_MESSAGES.NO_CONTEXT);
   }
 
-  const phi4 = getPhi4Service();
-  return await phi4.answerQuestion(question, contextString);
+  const agent = getAgentService();
+  return await agent.answerQuestion(question, contextString);
 }

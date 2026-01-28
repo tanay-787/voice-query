@@ -15,6 +15,7 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { withUniwind } from 'uniwind';
 import Constants from 'expo-constants';
+import { useSQLiteContext } from 'expo-sqlite';
 
 // Components
 import {
@@ -27,7 +28,6 @@ import {
 } from '@/components';
 
 // Business Layer Hooks
-import { useDatabase } from '@/lib/hooks/useDatabase';
 import { useDocumentContext } from '@/lib/hooks/useDocumentContext';
 import { useDocumentProcessor } from '@/lib/hooks/useDocumentProcessor';
 import { useVoiceInteraction } from '@/lib/hooks/useAudio';
@@ -44,8 +44,8 @@ export default function MainScreen() {
   // BUSINESS LAYER - Real hooks
   // ========================================================================
   
-  const database = useDatabase();
-  const documentContext = useDocumentContext(database.db);
+  const db = useSQLiteContext(); // Database is guaranteed to be ready
+  const documentContext = useDocumentContext(db);
   const documentProcessor = useDocumentProcessor();
   const { showError, showSuccess, handleError } = useErrorHandler();
 
@@ -80,10 +80,8 @@ export default function MainScreen() {
   
   // Load existing context from SQLite on mount
   useEffect(() => {
-    if (database.isReady) {
-      documentContext.loadContext();
-    }
-  }, [database.isReady]);
+    documentContext.loadContext();
+  }, []);
 
   // ========================================================================
   // LOCAL STATE

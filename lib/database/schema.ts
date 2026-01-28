@@ -25,11 +25,13 @@ CREATE TABLE IF NOT EXISTS document_context (
 `;
 
 /**
- * Indices for performance (though we only have 1 row)
+ * Indices for performance
+ * Note: No indices needed for single-row table (id = 1)
+ * All queries use PRIMARY KEY which is already indexed
  */
 export const CREATE_INDICES = `
-CREATE INDEX IF NOT EXISTS idx_source ON document_context(source);
-CREATE INDEX IF NOT EXISTS idx_updated_at ON document_context(updated_at);
+-- No indices needed for single-row table
+-- All queries use PRIMARY KEY (id = 1)
 `;
 
 /**

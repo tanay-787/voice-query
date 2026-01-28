@@ -12,15 +12,14 @@ import {
 /**
  * Hook to manage document context
  * Provides methods to get, save, delete context
+ * Note: db is guaranteed to be ready via SQLiteProvider
  */
-export function useDocumentContext(db: SQLiteDatabase | null) {
+export function useDocumentContext(db: SQLiteDatabase) {
   const [context, setContext] = useState<FormattedContext | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   const loadContext = useCallback(async () => {
-    if (!db) return;
-
     setIsLoading(true);
     setError(null);
 
@@ -39,8 +38,6 @@ export function useDocumentContext(db: SQLiteDatabase | null) {
 
   const save = useCallback(
     async (input: DocumentContextInput) => {
-      if (!db) throw new Error('Database not ready');
-
       setIsLoading(true);
       setError(null);
 
@@ -60,8 +57,6 @@ export function useDocumentContext(db: SQLiteDatabase | null) {
   );
 
   const remove = useCallback(async () => {
-    if (!db) throw new Error('Database not ready');
-
     setIsLoading(true);
     setError(null);
 
@@ -78,7 +73,6 @@ export function useDocumentContext(db: SQLiteDatabase | null) {
   }, [db]);
 
   const checkExists = useCallback(async () => {
-    if (!db) return false;
     try {
       return await hasContext(db);
     } catch (err) {

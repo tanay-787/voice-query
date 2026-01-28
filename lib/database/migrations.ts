@@ -8,6 +8,16 @@ import { CREATE_CONTEXT_TABLE, CREATE_INDICES, DB_NAME } from './schema';
 
 export async function migrateDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
   try {
+    // Verify database integrity first
+    const integrity = await db.getFirstAsync<{ integrity_check: string }>(
+      'PRAGMA integrity_check'
+    );
+    
+    if (integrity?.integrity_check !== 'ok') {
+      console.error('[Migration] Database corruption detected');
+      throw new Error('Database integrity check failed');
+    }
+
     // Get current version
     const result = await db.getFirstAsync<{ user_version: number }>(
       'PRAGMA user_version'
@@ -39,6 +49,13 @@ export async function migrateDatabase(db: SQLite.SQLiteDatabase): Promise<void> 
 async function migrateToV1(db: SQLite.SQLiteDatabase): Promise<void> {
   console.log('[Migration] Migrating to v1...');
 
+  // Enable WAL mode BEFORE transaction (cannot be changed inside transaction)
+  await db.execAsync('PRAGMA journal_mode = WAL;');
+  
+  // Enable foreign key constraints
+  await db.execAsync('PRAGMA foreign_keys = ON;');
+
+  // Now run the schema migration inside a transaction
   await db.execAsync(`
     BEGIN TRANSACTION;
     
@@ -66,3 +83,5 @@ export async function initDatabase(): Promise<SQLite.SQLiteDatabase> {
     throw error;
   }
 }
+
+export { DB_NAME };
