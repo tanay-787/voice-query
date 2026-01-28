@@ -59,10 +59,29 @@ export function AudioWaveform({
 }: AudioWaveformProps) {
   const [accentColor] = useThemeColor(['accent']);
   
-  // Create animated values for each bar
-  const bars = Array.from({ length: barCount }, () => ({
-    scale: useSharedValue(0.3),
-  }));
+  // Create animated values for each bar (fixed count to avoid hook violations)
+  const bar0 = useSharedValue(0.3);
+  const bar1 = useSharedValue(0.3);
+  const bar2 = useSharedValue(0.3);
+  const bar3 = useSharedValue(0.3);
+  const bar4 = useSharedValue(0.3);
+  const bar5 = useSharedValue(0.3);
+  const bar6 = useSharedValue(0.3);
+
+  // Map to array for iteration (all bars created, use only what's needed)
+  const allBars = [bar0, bar1, bar2, bar3, bar4, bar5, bar6];
+  const bars = allBars.slice(0, barCount);
+
+  // Animated styles for each bar (hooks called unconditionally)
+  const animatedStyle0 = useAnimatedStyle(() => ({ transform: [{ scaleY: bar0.value }] }));
+  const animatedStyle1 = useAnimatedStyle(() => ({ transform: [{ scaleY: bar1.value }] }));
+  const animatedStyle2 = useAnimatedStyle(() => ({ transform: [{ scaleY: bar2.value }] }));
+  const animatedStyle3 = useAnimatedStyle(() => ({ transform: [{ scaleY: bar3.value }] }));
+  const animatedStyle4 = useAnimatedStyle(() => ({ transform: [{ scaleY: bar4.value }] }));
+  const animatedStyle5 = useAnimatedStyle(() => ({ transform: [{ scaleY: bar5.value }] }));
+  const animatedStyle6 = useAnimatedStyle(() => ({ transform: [{ scaleY: bar6.value }] }));
+
+  const animatedStyles = [animatedStyle0, animatedStyle1, animatedStyle2, animatedStyle3, animatedStyle4, animatedStyle5, animatedStyle6];
 
   useEffect(() => {
     if (isActive) {
@@ -71,7 +90,7 @@ export function AudioWaveform({
         const delay = index * 100; // Stagger animation
         const duration = 800 + Math.random() * 400; // Randomize duration slightly
         
-        bar.scale.value = withRepeat(
+        bar.value = withRepeat(
           withSequence(
             withTiming(1, { 
               duration: duration / 2, 
@@ -89,34 +108,28 @@ export function AudioWaveform({
     } else {
       // Reset to idle state
       bars.forEach((bar) => {
-        bar.scale.value = withTiming(0.3, { duration: 300 });
+        bar.value = withTiming(0.3, { duration: 300 });
       });
     }
-  }, [isActive]);
+  }, [isActive, barCount]);
 
   return (
     <View className="flex-row items-center justify-center gap-1.5" style={{ height: size }}>
-      {bars.map((bar, index) => {
-        const animatedStyle = useAnimatedStyle(() => ({
-          transform: [{ scaleY: bar.scale.value }],
-        }));
-
-        return (
-          <AnimatedView
-            key={index}
-            className="rounded-full"
-            style={[
-              animatedStyle,
-              {
-                width: 4,
-                height: size * 0.6,
-                backgroundColor: accentColor,
-                opacity: 0.8,
-              },
-            ]}
-          />
-        );
-      })}
+      {bars.map((bar, index) => (
+        <AnimatedView
+          key={index}
+          className="rounded-full"
+          style={[
+            animatedStyles[index],
+            {
+              width: 4,
+              height: size * 0.6,
+              backgroundColor: accentColor,
+              opacity: 0.8,
+            },
+          ]}
+        />
+      ))}
     </View>
   );
 }

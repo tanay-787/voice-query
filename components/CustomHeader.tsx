@@ -27,7 +27,7 @@ interface CustomHeaderProps {
 
 export function CustomHeader({ documentContext, onChangeDocument }: CustomHeaderProps) {
   return (
-    <View className="bg-background border-b border-border pt-safe-offset-3">
+    <View className="bg-surface border-b border-border pt-safe-offset-3">
       <View className="px-4 pb-3 flex-row items-center justify-between gap-x-2">
         {/* Left: Title & Document Info */}
         <View className="flex-1">

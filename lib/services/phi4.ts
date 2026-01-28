@@ -94,8 +94,9 @@ class Phi4Service {
             }
           ],
           model: MODEL_NAME,
-          temperature: 0.7,
-          max_tokens: 1000
+          temperature: 0.3, // Lower temperature to reduce hallucinations
+          max_tokens: 100,  // STRICT limit for conversational brevity (~60-80 words)
+          top_p: 0.9,       // Nucleus sampling for better quality
         }
       });
 
@@ -103,14 +104,61 @@ class Phi4Service {
         throw response.body.error;
       }
 
-      console.log('[Phi-4] Answer generated');
-      const text = response.body.choices[0].message.content;
-      return text ? text.trim() : "I don't know.";
+      const rawText = response.body.choices[0].message.content;
+      if (!rawText) {
+        return "I don't know.";
+      }
+
+      const answer = rawText.trim();
+      
+      // Validate answer quality (detect hallucinations/gibberish)
+      if (!this.isValidAnswer(answer)) {
+        console.warn('[Phi-4] Invalid answer detected (possible hallucination):', answer.substring(0, 100));
+        return "I couldn't generate a proper answer. Please try rephrasing your question.";
+      }
+
+      console.log('[Phi-4] Answer generated:', answer.substring(0, 100));
+      return answer;
 
     } catch (error) {
       console.error('[Phi-4] Q&A failed:', error);
       throw new Error('Failed to generate answer');
     }
+  }
+
+  /**
+   * Validate answer quality to detect hallucinations/gibberish
+   */
+  private isValidAnswer(text: string): boolean {
+    // Check 1: Too short or too long
+    if (text.length < 10 || text.length > 2000) {
+      return false;
+    }
+
+    // Check 2: Detect excessive repetition (hallucination sign)
+    const words = text.split(/\s+/);
+    const uniqueWords = new Set(words.map(w => w.toLowerCase()));
+    const repetitionRatio = uniqueWords.size / words.length;
+    if (repetitionRatio < 0.3) { // More than 70% repetition
+      return false;
+    }
+
+    // Check 3: Detect random character sequences (gibberish)
+    // Count ratio of alphabetic characters to total
+    const alphaCount = (text.match(/[a-zA-Z]/g) || []).length;
+    const alphaRatio = alphaCount / text.length;
+    if (alphaRatio < 0.5) { // Less than 50% alphabetic chars
+      return false;
+    }
+
+    // Check 4: Detect excessive special characters (malformed output)
+    const specialCharCount = (text.match(/[^a-zA-Z0-9\s.,!?'"()-]/g) || []).length;
+    const specialCharRatio = specialCharCount / text.length;
+    if (specialCharRatio > 0.3) { // More than 30% special chars
+      return false;
+    }
+
+    return true;
   }
 }
 

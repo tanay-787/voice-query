@@ -17,7 +17,7 @@ import { View } from 'react-native';
 import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
 import { withUniwind } from 'uniwind';
 import { ThemedIcon } from '../ThemedIcon';
-import { TranscriptCard } from './TranscriptCard';
+import { AgentStatusCard } from './AgentStatusCard';
 import { VoiceButton, type VoiceButtonState } from './VoiceButton';
 
 const AnimatedView = withUniwind(Animated.View);
@@ -119,11 +119,10 @@ export function VoiceInputArea({
 
   return (
     <View className="gap-4">
-      {/* Transcript Card - Slides up during interaction */}
-      <TranscriptCard
+      {/* Agent Status Card - Shows status instead of full content */}
+      <AgentStatusCard
         state={voiceState}
         transcript={voiceInteraction.transcription || ''}
-        answer={voiceInteraction.answer || ''}
         duration={voiceInteraction.duration}
       />
 

@@ -15,6 +15,7 @@ export {
   VoiceInputArea,
   VoiceButton,
   TranscriptCard,
+  AgentStatusCard,
   AudioWaveform,
   type VoiceButtonState,
 } from './voice';
@@ -22,4 +23,6 @@ export {
 // Chat Components
 export { ChatMessageList, MessageBubble } from './chat';
 
+// Vocal UI Components
+export { CentralVoiceCircle } from './vocal-ui';
 

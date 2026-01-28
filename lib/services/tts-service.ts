@@ -25,7 +25,21 @@ class TTSService {
         await this.stop();
       }
 
-      console.log('[TTS] Speaking:', text.substring(0, 50));
+      // Validate and truncate text (Expo Speech limit: 4000 chars)
+      const MAX_TTS_LENGTH = 3900; // Safety margin
+      let textToSpeak = text.trim();
+      
+      if (textToSpeak.length > MAX_TTS_LENGTH) {
+        console.warn(`[TTS] Text too long (${textToSpeak.length} chars), truncating to ${MAX_TTS_LENGTH}`);
+        // Truncate at sentence boundary if possible
+        textToSpeak = this.truncateAtSentence(textToSpeak, MAX_TTS_LENGTH);
+      }
+
+      if (!textToSpeak) {
+        throw new Error('No text to speak');
+      }
+
+      console.log('[TTS] Speaking:', textToSpeak.substring(0, 50), `(${textToSpeak.length} chars)`);
 
       const {
         rate = 1.0,
@@ -37,7 +51,7 @@ class TTSService {
       this.isSpeaking = true;
 
       // Use expo-speech
-      Speech.speak(text, {
+      Speech.speak(textToSpeak, {
         language,
         pitch,
         rate,
@@ -60,6 +74,37 @@ class TTSService {
       console.error('[TTS] Failed to speak:', error);
       throw new Error('Failed to speak text');
     }
+  }
+
+  /**
+   * Truncate text at sentence boundary
+   */
+  private truncateAtSentence(text: string, maxLength: number): string {
+    if (text.length <= maxLength) {
+      return text;
+    }
+
+    // Try to truncate at last sentence within limit
+    const truncated = text.substring(0, maxLength);
+    const lastSentenceEnd = Math.max(
+      truncated.lastIndexOf('. '),
+      truncated.lastIndexOf('! '),
+      truncated.lastIndexOf('? ')
+    );
+
+    if (lastSentenceEnd > maxLength * 0.5) {
+      // Found a good sentence boundary (at least 50% through)
+      return truncated.substring(0, lastSentenceEnd + 1);
+    }
+
+    // No good sentence boundary, truncate at word boundary
+    const lastSpace = truncated.lastIndexOf(' ');
+    if (lastSpace > 0) {
+      return truncated.substring(0, lastSpace) + '...';
+    }
+
+    // Fallback: hard truncate
+    return truncated + '...';
   }
 
   /**

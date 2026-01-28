@@ -78,13 +78,33 @@ export default function Home() {
               Test Phase 4
             </Text>
           </Pressable>
+
+          <Pressable
+            onPress={() => router.push('/ui-revamp')}
+            style={({ pressed }) => ({
+              backgroundColor: pressed ? '#dc2626' : '#ef4444',
+              paddingVertical: 16,
+              paddingHorizontal: 32,
+              borderRadius: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 12,
+            })}
+          >
+            <StyledIonicons name="color-wand" size={24} color="white" />
+            <Text style={{ color: 'white', fontSize: 18, fontWeight: '600' }}>
+              UI Revamp
+            </Text>
+          </Pressable>
         </View>
 
         <View style={{ marginTop: 48, padding: 16, backgroundColor: '#f3f4f6', borderRadius: 8 }}>
           <Text style={{ fontSize: 14, color: '#374151', textAlign: 'center' }}>
             Phase 1 & 2: Database, Validation, AI{'\n'}
             Phase 3: Audio Recording, STT, TTS{'\n'}
-            Phase 4: Develop UI in Isolation
+            Phase 4: Develop UI in Isolation{'\n'}
+            Phase 5: UI Revamp: Redesign Interface
           </Text>
         </View>
       </View>
