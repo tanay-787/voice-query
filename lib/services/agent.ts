@@ -1,5 +1,5 @@
-import { ERROR_MESSAGES } from '@/constants/limits';
-import { QA_SYSTEM_PROMPT, QA_USER_PROMPT, SUMMARIZATION_PROMPT } from '@/constants/prompts';
+import { ERROR_MESSAGES } from '@/lib/constants/limits';
+import { QA_SYSTEM_PROMPT, QA_USER_PROMPT, SUMMARIZATION_PROMPT } from '@/lib/constants/prompts';
 import { parseJSONSafely, validateDocumentSummary } from '@/lib/services/validation';
 import type { DocumentSummary } from '@/lib/types/context';
 import ModelClient, { isUnexpected } from "@azure-rest/ai-inference";

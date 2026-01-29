@@ -1,27 +1,27 @@
 /**
- * AudioWaveform Component
+ * AudioWave Component
  * Minimal Siri-like waveform animation for voice recording feedback
  * 
  * Design: Clean, professional, subtle animation
  * Uses react-native-reanimated for smooth 60fps performance
  */
 
+import { useThemeColor } from 'heroui-native';
 import React, { useEffect } from 'react';
 import { View } from 'react-native';
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withTiming,
-  withSequence,
   Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
 } from 'react-native-reanimated';
 import { withUniwind } from 'uniwind';
-import { useThemeColor } from 'heroui-native';
 
 const AnimatedView = withUniwind(Animated.View);
 
-interface AudioWaveformProps {
+interface AudioWaveProps {
   /**
    * Whether the waveform should be animating
    */
@@ -41,7 +41,7 @@ interface AudioWaveformProps {
 }
 
 /**
- * Minimal Siri-like AudioWaveform
+ * Minimal Siri-like AudioWave
  * 
  * Features:
  * - Smooth, subtle bar animations
@@ -50,13 +50,13 @@ interface AudioWaveformProps {
  * - 60fps performance with reanimated
  * 
  * @example
- * <AudioWaveform isActive={isRecording} size={100} />
+ * <AudioWave isActive={isRecording} size={100} />
  */
-export function AudioWaveform({ 
+export function AudioWave({ 
   isActive, 
   size = 120,
   barCount = 5,
-}: AudioWaveformProps) {
+}: AudioWaveProps) {
   const [accentColor] = useThemeColor(['accent']);
   
   // Create animated values for each bar (fixed count to avoid hook violations)

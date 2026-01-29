@@ -25,7 +25,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { findNodeHandle, Text, TextInput, View, type BlurEvent, type FocusEvent } from 'react-native';
 import Animated, { FadeInDown, FadeOutUp, LinearTransition } from 'react-native-reanimated';
 import { withUniwind } from 'uniwind';
-import { ThemedIcon } from './ThemedIcon';
+import { ThemedIcon } from '../ThemedIcon';
 
 const StyledText = withUniwind(Text);
 const AnimatedView = withUniwind(Animated.View);

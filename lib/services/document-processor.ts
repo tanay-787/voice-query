@@ -1,4 +1,4 @@
-import { ERROR_MESSAGES } from '@/constants/limits';
+import { ERROR_MESSAGES } from '@/lib/constants/limits';
 import { getAgentService } from '@/lib/services/agent';
 import { getGeminiService } from '@/lib/services/gemini';
 import { convertURLToMarkdown } from '@/lib/services/url-to-markdown';

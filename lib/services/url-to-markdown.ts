@@ -1,4 +1,4 @@
-import { ERROR_MESSAGES } from '@/constants/limits';
+import { ERROR_MESSAGES } from '@/lib/constants/limits';
 import { validateURL, validateMarkdownContent } from '@/lib/services/validation';
 import type { URLToMarkdownResponse } from '@/lib/types/api';
 

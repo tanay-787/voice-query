@@ -3,9 +3,15 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"],
+      "@/components": ["./components"],
+      "@/lib": ["./lib"],
+      "@/hooks": ["./lib/hooks"],
+      "@/services": ["./lib/services"],
+      "@/types": ["./lib/types"],
+      "@/utils": ["./lib/utils"],
+      "@/constants": ["./lib/constants"],
+      "@/database": ["./lib/database"]
     }
   },
   "include": [

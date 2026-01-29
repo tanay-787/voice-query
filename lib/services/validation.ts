@@ -1,4 +1,4 @@
-import { ERROR_MESSAGES } from '@/constants/limits';
+import { ERROR_MESSAGES } from '@/lib/constants/limits';
 import {
   pdfFileSchema,
   urlSchema,
@@ -8,7 +8,7 @@ import {
   type URLInput,
   type MarkdownContent,
   type DocumentSummaryInput,
-} from '@/utils/validators';
+} from '@/lib/utils/validators';
 import type { DocumentSummary } from '@/lib/types/context';
 
 /**

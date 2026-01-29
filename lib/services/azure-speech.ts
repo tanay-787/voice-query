@@ -1,11 +1,30 @@
 import { File } from 'expo-file-system';
 import { fetch } from 'expo/fetch';
+import Constants from 'expo-constants';
 
 export interface AzureSpeechConfig {
   apiKey: string;
   region: string;
   language?: string; // e.g. 'en-US'
   voiceName?: string; // e.g. 'en-US-JennyNeural'
+}
+
+/**
+ * Get Azure Speech configuration from environment
+ */
+export function getAzureSpeechConfig(): AzureSpeechConfig {
+  const apiKey = Constants.expoConfig?.extra?.AZURE_SPEECH_SERVICE_KEY || 
+                 process.env.AZURE_SPEECH_SERVICE_KEY;
+  
+  const region = Constants.expoConfig?.extra?.AZURE_REGION || 
+                 process.env.AZURE_REGION || 
+                 'southeastasia';
+
+  return {
+    apiKey,
+    region,
+    language: 'en-US'
+  };
 }
 
 const getEndpoints = (region: string) => ({

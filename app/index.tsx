@@ -1,113 +1,219 @@
+import {
+  ChatMessageList,
+  DocumentDetailsPopover,
+  DocumentInfoTrigger,
+  DocumentUploadBottomSheet,
+  VoiceInterface,
+} from '@/components';
+import {
+  useDocumentContext,
+  useDocumentProcessor,
+  useErrorHandler,
+  useVoiceInteraction
+} from '@/hooks';
+import { getAzureSpeechConfig } from '@/lib/services/azure-speech';
+import { createMessage, type Message } from '@/types';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter } from 'expo-router';
-import React from 'react';
+import { Stack } from 'expo-router';
+import { useSQLiteContext } from 'expo-sqlite';
+import React, { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { withUniwind } from 'uniwind';
 
+const StyledView = withUniwind(View);
+const StyledText = withUniwind(Text);
+const StyledPressable = withUniwind(Pressable);
 const StyledIonicons = withUniwind(Ionicons);
 
-export default function Home() {
-  const router = useRouter();
+type VoiceState = 'idle' | 'listening' | 'processing' | 'answering';
+
+export default function IndexScreen() {
+  // ========================================================================
+  // BUSINESS LAYER
+  // ========================================================================
+  
+  const db = useSQLiteContext(); // Database is guaranteed to be ready
+  const documentContext = useDocumentContext(db);
+  const documentProcessor = useDocumentProcessor();
+  const { showError, showSuccess, handleError } = useErrorHandler();
+
+  // ========================================================================
+  // AZURE SPEECH CONFIGURATION
+  // ========================================================================
+
+  const azureConfig = getAzureSpeechConfig();
+
+  const voiceInteraction = useVoiceInteraction(
+    documentContext.context ? documentContext.getPromptContext() : null,
+    undefined,
+    azureConfig
+  );
+
+  // ========================================================================
+  // LOCAL STATE
+  // ========================================================================
+  
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
+
+  // ========================================================================
+  // LIFECYCLE
+  // ========================================================================
+  
+  useEffect(() => {
+    documentContext.loadContext();
+  }, []);
+
+  // Monitor voice interaction errors
+  useEffect(() => {
+    if (voiceInteraction.error) {
+      handleError(voiceInteraction.error);
+    }
+  }, [voiceInteraction.error]);
+
+  // Track voice messages
+  useEffect(() => {
+    if (!voiceInteraction.transcription || !voiceInteraction.answer) {
+      return;
+    }
+
+    // Add user message
+    if (voiceInteraction.transcription && 
+        !messages.some(m => m.content === voiceInteraction.transcription && m.role === 'user')) {
+      const userMessage = createMessage(
+        'user',
+        voiceInteraction.transcription,
+        'voice'
+      );
+      setMessages(prev => [...prev, userMessage]);
+    }
+
+    // Add assistant message
+    if (voiceInteraction.answer && 
+        !messages.some(m => m.content === voiceInteraction.answer && m.role === 'assistant')) {
+      const assistantMessage = createMessage(
+        'assistant',
+        voiceInteraction.answer,
+        'voice'
+      );
+      setMessages(prev => [...prev, assistantMessage]);
+    }
+  }, [voiceInteraction.transcription, voiceInteraction.answer]);
+
+  // Clear messages when document changes
+  useEffect(() => {
+    setMessages([]);
+  }, [documentContext.context]);
+
+  // ========================================================================
+  // HANDLERS
+  // ========================================================================
+  
+  const handleVoicePress = async () => {
+    // Check if document context exists
+    if (!documentContext.context) {
+      // Open upload bottom sheet
+      setIsUploadOpen(true);
+      return;
+    }
+
+    // Start voice interaction
+    try {
+      if (!voiceInteraction.isRecording && !voiceInteraction.isProcessing) {
+        await voiceInteraction.startVoiceQuestion();
+      } else if (voiceInteraction.isRecording) {
+        await voiceInteraction.stopAndProcess();
+      }
+    } catch (error) {
+      handleError(error as Error);
+    }
+  };
+
+  const getVoiceState = (): VoiceState => {
+    if (voiceInteraction.isRecording) {
+      return 'listening';
+    }
+    if (voiceInteraction.isProcessing) {
+      return 'processing';
+    }
+    if (voiceInteraction.isSpeaking) {
+      return 'answering';
+    }
+    return 'idle';
+  };
+
+  const voiceState = getVoiceState();
+
+  // ========================================================================
+  // RENDER
+  // ========================================================================
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }} edges={['top', 'left', 'right']}>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
       
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-        <Text style={{ fontSize: 28, fontWeight: 'bold', marginBottom: 8 }}>
-          Lock PDF + URL Agent
-        </Text>
-        <Text style={{ fontSize: 16, color: '#666', marginBottom: 48, textAlign: 'center' }}>
-          v1.0 - Production-grade AI assistant
-        </Text>
-
-        <View style={{ gap: 16, width: '100%', maxWidth: 300 }}>
-          <Pressable
-            onPress={() => router.push('/test')}
-            style={({ pressed }) => ({
-              backgroundColor: pressed ? '#2563eb' : '#3b82f6',
-              paddingVertical: 16,
-              paddingHorizontal: 32,
-              borderRadius: 12,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 12,
-            })}
+      <StyledView className="flex-1 bg-surface pb-safe-offset-3">
+        {/* Top Bar: Chat History Button */}
+        <StyledView className="absolute top-12 right-6 z-10">
+          <StyledPressable
+            onPress={() => setIsHistoryOpen(!isHistoryOpen)}
+            className="bg-background rounded-full p-3 shadow-sm"
           >
-            <StyledIonicons name="flask" size={24} color="white" />
-            <Text style={{ color: 'white', fontSize: 18, fontWeight: '600' }}>
-              Test Phase 1 & 2
-            </Text>
-          </Pressable>
+            <StyledIonicons 
+              name={isHistoryOpen ? "close" : "chatbubbles"} 
+              size={24} 
+              className="text-foreground" 
+            />
+          </StyledPressable>
+        </StyledView>
 
-          <Pressable
-            onPress={() => router.push('/audio-test')}
-            style={({ pressed }) => ({
-              backgroundColor: pressed ? '#059669' : '#10b981',
-              paddingVertical: 16,
-              paddingHorizontal: 32,
-              borderRadius: 12,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 12,
-            })}
-          >
-            <StyledIonicons name="mic" size={24} color="white" />
-            <Text style={{ color: 'white', fontSize: 18, fontWeight: '600' }}>
-              Test Phase 3 (Audio)
-            </Text>
-          </Pressable>
+        {/* Main Content: Central Voice Circle or Chat History */}
+        {isHistoryOpen ? (
+          <StyledView className="flex-1 pt-20">
+            <StyledView className="px-6 pb-4">
+              <StyledText className="text-foreground text-2xl font-bold">
+                Chat History
+              </StyledText>
+              {documentContext.context && (
+                <StyledText className="text-muted text-sm mt-1">
+                  {documentContext.context.title || 'Untitled Document'}
+                </StyledText>
+              )}
+            </StyledView>
+            <ChatMessageList messages={messages} isLoading={false} />
+          </StyledView>
+        ) : (
+          <VoiceInterface
+            state={voiceState}
+            transcript={voiceInteraction.transcription}
+            answer={voiceInteraction.answer}
+            onPress={handleVoicePress}
+            disabled={voiceInteraction.isProcessing}
+          />
+        )}
 
-          <Pressable
-            onPress={() => router.push('/main')}
-            style={({ pressed }) => ({
-              backgroundColor: pressed ? '#2563eb' : '#3b82f6',
-              paddingVertical: 16,
-              paddingHorizontal: 32,
-              borderRadius: 12,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 12,
-            })}
-          >
-            <StyledIonicons name="eye" size={24} color="white" />
-            <Text style={{ color: 'white', fontSize: 18, fontWeight: '600' }}>
-              Test Phase 4
-            </Text>
-          </Pressable>
+        {/* Document Info Footer (only when idle and has context) */}
+        {voiceState === 'idle' && documentContext.context && !isHistoryOpen && (
+          <StyledView className="pb-safe-offset-1 absolute bottom-8 left-6 right-6">
+            <DocumentDetailsPopover
+              context={documentContext.context}
+              documentContext={documentContext}
+              onDelete={() => setIsUploadOpen(true)}
+            >
+              <DocumentInfoTrigger context={documentContext.context} />
+            </DocumentDetailsPopover>
+          </StyledView>
+        )}
 
-          <Pressable
-            onPress={() => router.push('/ui-revamp')}
-            style={({ pressed }) => ({
-              backgroundColor: pressed ? '#dc2626' : '#ef4444',
-              paddingVertical: 16,
-              paddingHorizontal: 32,
-              borderRadius: 12,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 12,
-            })}
-          >
-            <StyledIonicons name="color-wand" size={24} color="white" />
-            <Text style={{ color: 'white', fontSize: 18, fontWeight: '600' }}>
-              UI Revamp
-            </Text>
-          </Pressable>
-        </View>
-
-        <View style={{ marginTop: 48, padding: 16, backgroundColor: '#f3f4f6', borderRadius: 8 }}>
-          <Text style={{ fontSize: 14, color: '#374151', textAlign: 'center' }}>
-            Phase 1 & 2: Database, Validation, AI{'\n'}
-            Phase 3: Audio Recording, STT, TTS{'\n'}
-            Phase 4: Develop UI in Isolation{'\n'}
-            Phase 5: UI Revamp: Redesign Interface
-          </Text>
-        </View>
-      </View>
-    </SafeAreaView>
+        {/* Document Upload Bottom Sheet */}
+        <DocumentUploadBottomSheet
+          isOpen={isUploadOpen}
+          onOpenChange={setIsUploadOpen}
+          documentProcessor={documentProcessor}
+          documentContext={documentContext}
+        />
+      </StyledView>
+    </>
   );
 }

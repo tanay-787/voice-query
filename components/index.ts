@@ -2,30 +2,16 @@
  * Main components barrel export
  */
 
-export { ChatInput } from './ChatInput';
-export { CustomHeader } from './CustomHeader';
-export { DocumentUploadBottomSheet } from './DocumentUploadBottomSheet';
-export { DocumentUploadTrigger } from './DocumentUploadTrigger';
-export { EmptyState } from './EmptyState';
+export { DocumentUploadBottomSheet } from './document/DocumentUploadBottomSheet';
 export { ThemedIcon, ThemedIconVariants } from './ThemedIcon';
 export type { ThemedIconProps } from './ThemedIcon';
-
-// Voice Input Components
-export { 
-  VoiceInputArea,
-  VoiceButton,
-  TranscriptCard,
-  AgentStatusCard,
-  AudioWaveform,
-  type VoiceButtonState,
-} from './voice';
 
 // Chat Components
 export { ChatMessageList, MessageBubble } from './chat';
 
-// Vocal UI Components
-export { CentralVoiceCircle } from './vocal-ui';
+// Agent UI Components
+export { VoiceInterface } from './agent-ui';
 
 // Document Components
-export { DocumentInfoTrigger, DocumentDetailsPopover } from './document';
+export { DocumentDetailsPopover, DocumentInfoTrigger } from './document';
 

@@ -1,12 +1,11 @@
-import { 
-  useAudioRecorder, 
-  useAudioRecorderState,
+import { LIMITS } from '@/lib/constants/limits';
+import {
   RecordingPresets,
-  setAudioModeAsync,
   requestRecordingPermissionsAsync,
-  type RecorderState,
+  setAudioModeAsync,
+  useAudioRecorder,
+  useAudioRecorderState
 } from 'expo-audio';
-import { LIMITS } from '@/constants/limits';
 
 /**
  * Audio service utilities for recording
@@ -75,4 +74,4 @@ export function validateRecordingDuration(durationMs: number): void {
 }
 
 // Export hooks from expo-audio for direct use
-export { useAudioRecorder, useAudioRecorderState, RecordingPresets };
+export { RecordingPresets, useAudioRecorder, useAudioRecorderState };

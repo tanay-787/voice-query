@@ -1,6 +1,6 @@
 /**
- * CentralVoiceCircle Component
- * Main voice interaction circle for Agentic Vocal UI
+ * VoiceInterface Component
+ * Main voice interaction interface for Agentic Vocal UI
  * 
  * States:
  * - Idle: Mic icon in dotted circle
@@ -10,20 +10,20 @@
  */
 
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useThemeColor } from 'heroui-native';
 import React from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
   withSequence,
   withTiming,
-  Easing,
 } from 'react-native-reanimated';
 import { withUniwind } from 'uniwind';
-import { useThemeColor } from 'heroui-native';
 
-import { AudioWaveform } from '@/components/voice/AudioWaveform';
+import { AudioWave } from '@/components/agent-ui';
 
 const StyledView = withUniwind(View);
 const StyledText = withUniwind(Text);
@@ -33,7 +33,7 @@ const AnimatedView = withUniwind(Animated.View);
 
 type VoiceState = 'idle' | 'listening' | 'processing' | 'answering';
 
-interface CentralVoiceCircleProps {
+interface VoiceInterfaceProps {
   state: VoiceState;
   transcript?: string;
   answer?: string;
@@ -42,16 +42,16 @@ interface CentralVoiceCircleProps {
 }
 
 /**
- * Central Voice Interaction Circle
+ * Voice Interaction Interface
  * Main UI component for agentic vocal interface
  */
-export function CentralVoiceCircle({
+export function VoiceInterface({
   state,
   transcript = '',
   answer = '',
   onPress,
   disabled = false,
-}: CentralVoiceCircleProps) {
+}: VoiceInterfaceProps) {
   const [accentColor] = useThemeColor(['accent']);
   const [mutedColor] = useThemeColor(['muted']);
 
@@ -142,7 +142,7 @@ export function CentralVoiceCircle({
 
           {/* Listening: Waveform */}
           {state === 'listening' && (
-            <AudioWaveform isActive={true} size={120} barCount={7} />
+            <AudioWave isActive={true} size={120} barCount={7} />
           )}
 
           {/* Processing: Animated Dots */}
@@ -156,7 +156,7 @@ export function CentralVoiceCircle({
 
           {/* Answering: Subtle Waveform */}
           {state === 'answering' && (
-            <AudioWaveform isActive={true} size={100} barCount={5} />
+            <AudioWave isActive={true} size={100} barCount={5} />
           )}
         </AnimatedView>
       </StyledPressable>
