@@ -26,3 +26,6 @@ export { ChatMessageList, MessageBubble } from './chat';
 // Vocal UI Components
 export { CentralVoiceCircle } from './vocal-ui';
 
+// Document Components
+export { DocumentInfoTrigger, DocumentDetailsPopover } from './document';
+

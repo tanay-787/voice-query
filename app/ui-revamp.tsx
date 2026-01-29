@@ -21,15 +21,17 @@ import {
   CentralVoiceCircle,
   ChatMessageList,
   DocumentUploadBottomSheet,
+  DocumentInfoTrigger,
+  DocumentDetailsPopover,
 } from '@/components';
 
 // Business Layer Hooks
 import { useVoiceInteraction } from '@/lib/hooks/useAudio';
-import { useDatabase } from '@/lib/hooks/useDatabase';
 import { useDocumentContext } from '@/lib/hooks/useDocumentContext';
 import { useDocumentProcessor } from '@/lib/hooks/useDocumentProcessor';
 import { useErrorHandler } from '@/lib/hooks/useErrorHandler';
 import type { AzureSpeechConfig } from '@/lib/services/azure-speech';
+import { useSQLiteContext } from 'expo-sqlite';
 
 // Types
 import { createMessage, type Message } from '@/lib/types/conversation';
@@ -46,8 +48,8 @@ export default function UIRevampScreen() {
   // BUSINESS LAYER
   // ========================================================================
   
-  const database = useDatabase();
-  const documentContext = useDocumentContext(database.db);
+  const db = useSQLiteContext(); // Database is guaranteed to be ready
+  const documentContext = useDocumentContext(db);
   const documentProcessor = useDocumentProcessor();
   const { showError, showSuccess, handleError } = useErrorHandler();
 
@@ -86,10 +88,8 @@ export default function UIRevampScreen() {
   // ========================================================================
   
   useEffect(() => {
-    if (database.isReady) {
-      documentContext.loadContext();
-    }
-  }, [database.isReady]);
+    documentContext.loadContext();
+  }, []);
 
   // Monitor voice interaction errors
   useEffect(() => {
@@ -193,7 +193,7 @@ export default function UIRevampScreen() {
         <StyledView className="absolute top-12 right-6 z-10">
           <StyledPressable
             onPress={() => setIsHistoryOpen(!isHistoryOpen)}
-            className="bg-surface rounded-full p-3 shadow-sm"
+            className="bg-background rounded-full p-3 shadow-sm"
           >
             <StyledIonicons 
               name={isHistoryOpen ? "close" : "chatbubbles"} 
@@ -231,14 +231,13 @@ export default function UIRevampScreen() {
         {/* Document Info Footer (only when idle and has context) */}
         {voiceState === 'idle' && documentContext.context && !isHistoryOpen && (
           <StyledView className="pb-safe-offset-1 absolute bottom-8 left-6 right-6">
-            <StyledView className="bg-background rounded-2xl p-4 shadow-sm">
-              <StyledText className="text-muted text-xs uppercase tracking-wide mb-1">
-                Current Document
-              </StyledText>
-              <StyledText className="text-foreground text-sm font-medium">
-                {documentContext.context.title || 'Untitled Document'}
-              </StyledText>
-            </StyledView>
+            <DocumentDetailsPopover
+              context={documentContext.context}
+              documentContext={documentContext}
+              onDelete={() => setIsUploadOpen(true)}
+            >
+              <DocumentInfoTrigger context={documentContext.context} />
+            </DocumentDetailsPopover>
           </StyledView>
         )}
 
