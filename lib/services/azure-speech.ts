@@ -1,6 +1,7 @@
 import { File } from 'expo-file-system';
 import { fetch } from 'expo/fetch';
 import Constants from 'expo-constants';
+import type { SpeechRecognitionResult } from '@/lib/types/azure';
 
 export interface AzureSpeechConfig {
   apiKey: string;
@@ -60,7 +61,7 @@ export async function synthesizeSpeech(
 </speak>`;
 
   // Use Array for headers to avoid NativeRequest casting issues on Android
-  const headers = [
+  const headers: [string, string][] = [
     ['Ocp-Apim-Subscription-Key', apiKey],
     ['Content-Type', 'application/ssml+xml'],
     ['X-Microsoft-OutputFormat', 'riff-24khz-16bit-mono-pcm'],
@@ -70,7 +71,7 @@ export async function synthesizeSpeech(
   try {
     const response = await fetch(endpoints.TTS, {
       method: 'POST',
-      headers: headers as any,
+      headers: headers as unknown as Record<string, string>,
       body: ssml,
     });
 
@@ -104,7 +105,7 @@ export async function synthesizeSpeech(
 export async function recognizeSpeech(
   audioUri: string,
   config: AzureSpeechConfig
-): Promise<any> {
+): Promise<SpeechRecognitionResult> {
   const { apiKey, region, language = 'en-US' } = config;
   
   if (!apiKey) throw new Error('Azure Speech API Key is required');
@@ -114,7 +115,7 @@ export async function recognizeSpeech(
   const url = `https://${region}.api.cognitive.microsoft.com/speechtotext/transcriptions:transcribe?api-version=2025-10-15`;
 
   // Headers - fetch handles Content-Type for FormData automatically
-  const headers = [
+  const headers: [string, string][] = [
     ['Ocp-Apim-Subscription-Key', apiKey],
     ['Accept', 'application/json']
   ];
@@ -132,12 +133,12 @@ export async function recognizeSpeech(
 
     // 2. Append audio file
     const audioFile = new File(audioUri);
-    // Cast to any/Blob because TS might not fully recognize File as Blob in all environments
+    // Cast to Blob because TS might not fully recognize File as Blob in all environments
     formData.append('audio', audioFile as unknown as Blob);
 
     const response = await fetch(url, {
       method: 'POST',
-      headers: headers as any,
+      headers: headers as unknown as Record<string, string>,
       body: formData,
     });
 
@@ -146,14 +147,15 @@ export async function recognizeSpeech(
       throw new Error(`Azure STT Error: ${response.status} ${errorText}`);
     }
 
-    const result = await response.json();
+    const result = await response.json() as SpeechRecognitionResult;
     
     // Map new API response format to expected format (DisplayText)
     // New API returns { combinedPhrases: [{ text: "..." }], ... }
     if (result.combinedPhrases && result.combinedPhrases.length > 0) {
       return {
         ...result,
-        DisplayText: result.combinedPhrases[0].text
+        DisplayText: result.combinedPhrases[0].text,
+        phrases: result.combinedPhrases
       };
     }
 

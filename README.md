@@ -10,7 +10,7 @@ VoiceQuery is a cross-platform mobile application engineered to provide seamless
 
 ### Frontend & UI
 - **Framework**: React Native via Expo
-- **Styling**: Uniwind (Tailwind CSS for React Native)
+- **Styling**: Uniwind + HeroUI Native (Tailwind CSS for React Native with HeroUI component library)
 - **Routing**: Expo Router (file-based routing)
 - **State Management**: React Hooks with custom context providers
 - **Language**: TypeScript
@@ -21,22 +21,22 @@ VoiceQuery is a cross-platform mobile application engineered to provide seamless
 - `DocumentUploadBottomSheet` - Document ingestion modal interface
 - `DocumentDetailsPopover` - Metadata and document management controls
 
-### Backend Services
-- **Speech Recognition**: Azure Cognitive Services (Speech-to-Text API)
-- **Text-to-Speech**: Azure Speech Synthesis
-- **Document Processing**: Intelligent document parsing and context extraction
-- **Database**: SQLite (expo-sqlite) for local message storage and document metadata
+### AI & Language Processing
+- **LLM Engine**: Ministral-3B (via Azure-Inference-SDK and GitHub Models API)
+- **Document Summarization**: Google Gemini API for PDF content analysis and structured extraction
+- **URL Processing**: URL-to-Markdown converter for web page content ingestion
+- **Speech Recognition**: Native Expo Speech API
+- **Text-to-Speech**: Expo Speech with on-device voice synthesis
 
 ### Data Management
 - **Document Context Provider**: Manages uploaded document state, metadata, and retrieval
-- **Message Persistence**: SQLite-backed conversation history
-- **Document Processor**: Handles file ingestion, parsing, and semantic indexing
+- **Message Persistence**: SQLite (expo-sqlite) for conversation history and document metadata
+- **Document Processor**: Orchestrates PDF upload, URL ingestion, and context extraction
 
 ## Platform Support
 
 - **iOS** - Native deployment via Expo
 - **Android** - Native deployment via Expo
-- **Web** - React Native Web (limited feature parity)
 
 ## Deployment Strategy
 

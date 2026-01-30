@@ -21,7 +21,7 @@ if (!TOKEN) {
 }
 
 class AgentService {
-  private client: any; // Type as any for now due to @azure-rest/ai-inference dynamic nature
+  private client: ReturnType<typeof ModelClient>;
 
   constructor() {
     if (!TOKEN) {
@@ -55,16 +55,16 @@ class AgentService {
       });
 
       if (isUnexpected(response)) {
-        throw response.body.error;
+        throw new Error((response.body as { error?: { message: string } }).error?.message || 'Unexpected response from agent');
       }
 
       console.log('[Agent] Summary generated');
-      const responseText = response.body.choices[0].message.content;
+      const responseText = (response.body as { choices: Array<{ message: { content: string } }> }).choices[0].message.content;
 
       if (!responseText) throw new Error('Empty response from Agent');
 
-      const summaryData = parseJSONSafely(responseText, ERROR_MESSAGES.SUMMARY_FAILED);
-      return validateDocumentSummary(summaryData);
+      const summaryData = parseJSONSafely<DocumentSummary>(responseText, ERROR_MESSAGES.SUMMARY_FAILED);
+      return validateDocumentSummary(summaryData as any);
 
     } catch (error) {
       console.error('[Agent] Summarization failed:', error);
@@ -99,10 +99,10 @@ class AgentService {
       });
 
       if (isUnexpected(response)) {
-        throw response.body.error;
+        throw new Error((response.body as { error?: { message: string } }).error?.message || 'Unexpected response from agent');
       }
 
-      const rawText = response.body.choices[0].message.content;
+      const rawText = (response.body as { choices: Array<{ message: { content: string } }> }).choices[0].message.content;
       if (!rawText) {
         return "I don't know.";
       }

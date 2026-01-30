@@ -58,8 +58,8 @@ class GeminiService {
 
       // Parse and validate JSON response
       // We still use parseJSONSafely in case the model wraps it in markdown blocks despite mimeType
-      const summaryData = parseJSONSafely(responseText, ERROR_MESSAGES.SUMMARY_FAILED);
-      return validateDocumentSummary(summaryData);
+      const summaryData = parseJSONSafely<DocumentSummary>(responseText, ERROR_MESSAGES.SUMMARY_FAILED);
+      return validateDocumentSummary(summaryData as any);
     } catch (error) {
       console.error('[Gemini] Summarization failed:', error);
       throw error instanceof Error ? error : new Error(ERROR_MESSAGES.SUMMARY_FAILED);
