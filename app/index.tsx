@@ -28,18 +28,10 @@ const StyledIonicons = withUniwind(Ionicons);
 type VoiceState = 'idle' | 'listening' | 'processing' | 'answering';
 
 export default function IndexScreen() {
-  // ========================================================================
-  // BUSINESS LAYER
-  // ========================================================================
-  
-  const db = useSQLiteContext(); // Database is guaranteed to be ready
+  const db = useSQLiteContext();
   const documentContext = useDocumentContext(db);
   const documentProcessor = useDocumentProcessor();
   const { showError, showSuccess, handleError } = useErrorHandler();
-
-  // ========================================================================
-  // AZURE SPEECH CONFIGURATION
-  // ========================================================================
 
   const azureConfig = getAzureSpeechConfig();
 

@@ -1,5 +1,5 @@
+import { QA_SYSTEM_PROMPT, QA_USER_PROMPT, SUMMARIZATION_PROMPT } from '@/lib/constants/agent-prompts';
 import { ERROR_MESSAGES } from '@/lib/constants/limits';
-import { QA_SYSTEM_PROMPT, QA_USER_PROMPT, SUMMARIZATION_PROMPT } from '@/lib/constants/prompts';
 import { parseJSONSafely, validateDocumentSummary } from '@/lib/services/validation';
 import type { DocumentSummary } from '@/lib/types/context';
 import { GoogleGenAI, type Part } from '@google/genai';

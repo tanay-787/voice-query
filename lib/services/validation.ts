@@ -1,14 +1,14 @@
-import { ERROR_MESSAGES } from '@/lib/constants/limits';
 import {
+  documentSummarySchema,
+  markdownContentSchema,
   pdfFileSchema,
   urlSchema,
-  markdownContentSchema,
-  documentSummarySchema,
+  type DocumentSummaryInput,
+  type MarkdownContent,
   type PDFFileInput,
   type URLInput,
-  type MarkdownContent,
-  type DocumentSummaryInput,
-} from '@/lib/utils/validators';
+} from '@/constants';
+import { ERROR_MESSAGES } from '@/lib/constants/limits';
 import type { DocumentSummary } from '@/lib/types/context';
 
 /**
@@ -38,7 +38,7 @@ export function validatePDF(file: PDFFileInput): void {
 /**
  * Validate URL
  */
-export function validateURL(url: string): void {
+export function validateURL(url: URLInput): void {
   const result = urlSchema.safeParse(url);
 
   if (!result.success) {
@@ -49,7 +49,7 @@ export function validateURL(url: string): void {
 /**
  * Validate markdown content length
  */
-export function validateMarkdownContent(content: string): void {
+export function validateMarkdownContent(content: MarkdownContent): void {
   const result = markdownContentSchema.safeParse(content);
 
   if (!result.success) {
@@ -61,7 +61,7 @@ export function validateMarkdownContent(content: string): void {
  * Validate and parse document summary from AI
  */
 export function validateDocumentSummary(
-  data: unknown
+  data: DocumentSummaryInput
 ): DocumentSummary {
   const result = documentSummarySchema.safeParse(data);
 

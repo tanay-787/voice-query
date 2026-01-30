@@ -1,53 +1,82 @@
-> Edited for use in IDX on 07/09/12
+# VoiceQuery
 
-# Welcome to your Expo app 👋
+**Intelligent voice-powered document interaction platform** that enables users to ask natural language questions about documents through conversational AI.
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+## Overview
 
-## Get started
+VoiceQuery is a cross-platform mobile application engineered to provide seamless voice-based document analysis and retrieval. Users upload documents, then interact with them using voice commands and natural language queries. The system transcribes speech, processes queries against document context, and delivers synthesized responses—all within a single integrated workflow.
 
-#### Android
+## Technical Architecture
 
-Android previews are defined as a `workspace.onStart` hook and started as a vscode task when the workspace is opened/started.
+### Frontend & UI
+- **Framework**: React Native via Expo
+- **Styling**: Uniwind (Tailwind CSS for React Native)
+- **Routing**: Expo Router (file-based routing)
+- **State Management**: React Hooks with custom context providers
+- **Language**: TypeScript
 
-Note, if you can't find the task, either:
-- Rebuild the environment (using command palette: `IDX: Rebuild Environment`), or
-- Run `npm run android -- --tunnel` command manually run android and see the output in your terminal. The device should pick up this new command and switch to start displaying the output from it.
+### Core Components
+- `VoiceInterface` - Central voice interaction UI with real-time state feedback (listening, processing, answering)
+- `ChatMessageList` - Message history display with role-based rendering
+- `DocumentUploadBottomSheet` - Document ingestion modal interface
+- `DocumentDetailsPopover` - Metadata and document management controls
 
-In the output of this command/task, you'll find options to open the app in a
+### Backend Services
+- **Speech Recognition**: Azure Cognitive Services (Speech-to-Text API)
+- **Text-to-Speech**: Azure Speech Synthesis
+- **Document Processing**: Intelligent document parsing and context extraction
+- **Database**: SQLite (expo-sqlite) for local message storage and document metadata
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+### Data Management
+- **Document Context Provider**: Manages uploaded document state, metadata, and retrieval
+- **Message Persistence**: SQLite-backed conversation history
+- **Document Processor**: Handles file ingestion, parsing, and semantic indexing
 
-You'll also find options to open the app's developer menu, reload the app, and more.
+## Platform Support
 
-#### Web
+- **iOS** - Native deployment via Expo
+- **Android** - Native deployment via Expo
+- **Web** - React Native Web (limited feature parity)
 
-Web previews will be started and managred automatically. Use the toolbar to manually refresh.
+## Deployment Strategy
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+VoiceQuery utilizes Expo's managed workflow for efficient cross-platform distribution:
 
-## Get a fresh project
+1. **iOS**: Native compilation to .ipa via Expo Cloud Build or local `eas build`
+2. **Android**: Native compilation to .apk/.aab via Expo Cloud Build or local `eas build`
+3. **Distribution**: App Store (iOS) and Play Store (Android) via standard app store submission processes
 
-When you're ready, run:
+### Build & Configuration
+- `app.config.js` - Centralized app configuration and metadata
+- `metro.config.js` - Metro bundler configuration for React Native optimization
+- Environment variables managed via `.env.local` for service credentials (Azure Speech API keys)
 
-```bash
-npm run reset-project
-```
+## Dependencies
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### Key Libraries
+- `expo` - Managed React Native framework
+- `react-native` - Core cross-platform mobile framework
+- `expo-router` - File-based navigation
+- `expo-sqlite` - Local database access
+- `uniwind` - React Native Tailwind CSS integration
+- `@expo/vector-icons` - Icon library (Ionicons)
+- Azure SDKs - Speech recognition and synthesis
 
-## Learn more
+### Development
+- TypeScript for type safety
+- ESLint for code quality
+- PostCSS for styling compilation
 
-To learn more about developing your project with Expo, look at the following resources:
+## Feature Set
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+- **Voice-Powered Q&A**: Ask questions about documents using natural speech
+- **Real-time Transcription**: Live speech-to-text feedback
+- **Intelligent Responses**: LLM-driven document analysis with synthesized audio output
+- **Chat History**: Persistent conversation tracking with document association
+- **Multi-Document Support**: Upload and switch between different documents
+- **Document Metadata**: View and manage document information
+- **Error Handling**: Graceful error states with user notifications
 
-## Join the community
+## Delivery & Support
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+VoiceQuery is delivered as a compiled native application through platform-specific app stores. Ongoing updates are distributed through standard app store update mechanisms. Technical support and feature requests are handled through designated support channels.
