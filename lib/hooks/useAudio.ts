@@ -1,7 +1,7 @@
 import { getAgentService } from '@/services/agent';
-import { requestAudioPermissions, setupAudioMode, validateRecordingDuration } from '@/services/audio-service';
-import { AzureSpeechConfig, recognizeSpeech } from '@/services/azure-speech';
-import { getTTSService, type TTSOptions } from '@/services/tts-service';
+import { requestAudioPermissions, setupAudioMode, validateRecordingDuration } from '@/services/audio-recording';
+import { AzureSpeechConfig, recognizeSpeech } from '@/services/speech-to-text';
+import { getTTSService, type TTSOptions } from '@/services/text-to-speech';
 import {
   RecordingPresets,
   useAudioRecorder,

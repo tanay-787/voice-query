@@ -3,36 +3,24 @@
  * External APIs and integrations
  */
 
-export { getAgentService, AgentService } from './agent';
-export { 
-  requestAudioPermissions, 
-  setupAudioMode, 
-  validateRecordingDuration,
-  useAudioRecorder,
-  useAudioRecorderState,
-  RecordingPresets,
-  type AudioRecording
-} from './audio-service';
-export { 
-  synthesizeSpeech, 
-  recognizeSpeech,
-  type AzureSpeechConfig 
-} from './azure-speech';
-export { 
-  processPDF, 
-  processURL, 
-  askQuestion,
-  type ProcessingResult
+export { AgentService, getAgentService } from './agent';
+export {
+  RecordingPresets, requestAudioPermissions,
+  setupAudioMode, useAudioRecorder,
+  useAudioRecorderState, validateRecordingDuration, type AudioRecording
+} from './audio-recording';
+export {
+  askQuestion, processPDF,
+  processURL, type ProcessingResult
 } from './document-processor';
-export { getGeminiService, GeminiService } from './gemini';
-export { getTTSService, TTSService, type TTSOptions } from './tts-service';
+export { GeminiService, getGeminiService } from './gemini';
+export {
+  recognizeSpeech, synthesizeSpeech, type AzureSpeechConfig
+} from './speech-to-text';
+export { getTTSService, TTSService, type TTSOptions } from './text-to-speech';
 export { convertURLToMarkdown } from './url-to-markdown';
-export { 
-  ValidationError,
-  validatePDF,
-  validateURL,
-  validateMarkdownContent,
-  validateDocumentSummary,
-  parseJSONSafely
+export {
+  parseJSONSafely, validateDocumentSummary, validateMarkdownContent, validatePDF,
+  validateURL, ValidationError
 } from './validation';
 

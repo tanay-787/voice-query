@@ -3,11 +3,11 @@ import {
   DocumentDetailsPopover,
   DocumentInfoTrigger,
   DocumentUploadBottomSheet,
-  VoiceInterface,
   ThemedIcon,
+  VoiceInterface,
 } from '@/components';
 import { useDocumentContext, useDocumentProcessor, useErrorHandler, useVoiceInteraction } from '@/hooks';
-import { getAzureSpeechConfig } from '@/services/azure-speech';
+import { getAzureSpeechConfig } from '@/services/speech-to-text';
 import { createMessage, type Message } from '@/types/conversation';
 import { Stack } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';

@@ -106,7 +106,7 @@ export async function recognizeSpeech(
   audioUri: string,
   config: AzureSpeechConfig
 ): Promise<SpeechRecognitionResult> {
-  const { apiKey, region, language = 'en-US' } = config;
+  const { apiKey, region, language = 'en-IN' } = config;
   
   if (!apiKey) throw new Error('Azure Speech API Key is required');
   if (!region) throw new Error('Azure Region is required');
