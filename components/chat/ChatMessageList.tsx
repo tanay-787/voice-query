@@ -3,11 +3,11 @@
  * Scrollable list of chat messages with auto-scroll to latest
  */
 
+import type { Message } from '@/types/conversation';
 import React, { useEffect, useRef } from 'react';
 import { FlatList, Text, View, type ListRenderItem } from 'react-native';
 import { withUniwind } from 'uniwind';
 import { MessageBubble } from './MessageBubble';
-import type { Message } from '@/lib/types/conversation';
 
 const StyledText = withUniwind(Text);
 

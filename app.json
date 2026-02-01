@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "my-ai",
-    "slug": "my-ai",
+    "name": "voice-query",
+    "slug": "voice-query",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",

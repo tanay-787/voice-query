@@ -1,7 +1,7 @@
 import { File } from 'expo-file-system';
 import { fetch } from 'expo/fetch';
 import Constants from 'expo-constants';
-import type { SpeechRecognitionResult } from '@/lib/types/azure';
+import type { SpeechRecognitionResult } from '@/types/azure';
 
 export interface AzureSpeechConfig {
   apiKey: string;

@@ -4,16 +4,11 @@ import {
   DocumentInfoTrigger,
   DocumentUploadBottomSheet,
   VoiceInterface,
+  ThemedIcon,
 } from '@/components';
-import {
-  useDocumentContext,
-  useDocumentProcessor,
-  useErrorHandler,
-  useVoiceInteraction
-} from '@/hooks';
-import { getAzureSpeechConfig } from '@/lib/services/azure-speech';
-import { createMessage, type Message } from '@/types';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { useDocumentContext, useDocumentProcessor, useErrorHandler, useVoiceInteraction } from '@/hooks';
+import { getAzureSpeechConfig } from '@/services/azure-speech';
+import { createMessage, type Message } from '@/types/conversation';
 import { Stack } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import React, { useEffect, useState } from 'react';
@@ -23,7 +18,6 @@ import { withUniwind } from 'uniwind';
 const StyledView = withUniwind(View);
 const StyledText = withUniwind(Text);
 const StyledPressable = withUniwind(Pressable);
-const StyledIonicons = withUniwind(Ionicons);
 
 type VoiceState = 'idle' | 'listening' | 'processing' | 'answering';
 
@@ -152,10 +146,10 @@ export default function IndexScreen() {
             onPress={() => setIsHistoryOpen(!isHistoryOpen)}
             className="bg-background rounded-full p-3 shadow-sm"
           >
-            <StyledIonicons 
+            <ThemedIcon 
               name={isHistoryOpen ? "close" : "chatbubbles"} 
-              size={24} 
-              className="text-foreground" 
+              size={24}
+              themeColor="foreground"
             />
           </StyledPressable>
         </StyledView>

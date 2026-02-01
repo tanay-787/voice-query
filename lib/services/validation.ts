@@ -7,9 +7,9 @@ import {
   type MarkdownContent,
   type PDFFileInput,
   type URLInput,
-} from '@/constants';
-import { ERROR_MESSAGES } from '@/lib/constants/limits';
-import type { DocumentSummary } from '@/lib/types/context';
+} from '@/constants/input-validators';
+import { ERROR_MESSAGES } from '@/constants/limits';
+import type { DocumentSummary } from '@/types/context';
 
 /**
  * Validation service

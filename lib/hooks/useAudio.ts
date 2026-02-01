@@ -1,7 +1,7 @@
-import { getAgentService } from '@/lib/services/agent';
-import { requestAudioPermissions, setupAudioMode, validateRecordingDuration } from '@/lib/services/audio-service';
-import { AzureSpeechConfig, recognizeSpeech } from '@/lib/services/azure-speech';
-import { getTTSService, type TTSOptions } from '@/lib/services/tts-service';
+import { getAgentService } from '@/services/agent';
+import { requestAudioPermissions, setupAudioMode, validateRecordingDuration } from '@/services/audio-service';
+import { AzureSpeechConfig, recognizeSpeech } from '@/services/azure-speech';
+import { getTTSService, type TTSOptions } from '@/services/tts-service';
 import {
   RecordingPresets,
   useAudioRecorder,
@@ -130,6 +130,7 @@ export function useVoiceInteraction(
   const [answer, setAnswer] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [conversationHistory, setConversationHistory] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
   
   const agent = getAgentService();
 
@@ -195,8 +196,15 @@ export function useVoiceInteraction(
 
       // Get answer
       console.log('[VoiceInteraction] Getting answer...');
-      const answerText = await agent.answerQuestion(transcribedText, contextString);
+      const answerText = await agent.answerQuestion(transcribedText, contextString, conversationHistory);
       setAnswer(answerText);
+
+      // Update conversation history
+      setConversationHistory(prev => [
+        ...prev,
+        { role: 'user', content: transcribedText },
+        { role: 'assistant', content: answerText }
+      ]);
 
       // Speak answer
       console.log('[VoiceInteraction] Speaking answer...', voiceIdentifier ? `with voice ${voiceIdentifier}` : 'default voice');
@@ -222,6 +230,11 @@ export function useVoiceInteraction(
     setError(null);
   }, [recorder, recorderState, tts]);
 
+  // Reset conversation history when context changes
+  useEffect(() => {
+    setConversationHistory([]);
+  }, [contextString]);
+
   return {
     // State
     isRecording: recorderState.isRecording,
@@ -232,6 +245,7 @@ export function useVoiceInteraction(
     transcription,
     answer,
     error,
+    conversationHistory,
     
     // Actions
     getVoices: tts.getVoices, // Expose getVoices directly

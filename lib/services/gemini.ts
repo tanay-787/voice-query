@@ -1,7 +1,7 @@
-import { QA_SYSTEM_PROMPT, QA_USER_PROMPT, SUMMARIZATION_PROMPT } from '@/lib/constants/agent-prompts';
-import { ERROR_MESSAGES } from '@/lib/constants/limits';
-import { parseJSONSafely, validateDocumentSummary } from '@/lib/services/validation';
-import type { DocumentSummary } from '@/lib/types/context';
+import { QA_SYSTEM_PROMPT, QA_USER_PROMPT, SUMMARIZATION_PROMPT } from '@/constants/agent-prompts';
+import { ERROR_MESSAGES } from '@/constants/limits';
+import { parseJSONSafely, validateDocumentSummary } from '@/services/validation';
+import type { DocumentSummary } from '@/types/context';
 import { GoogleGenAI, type Part } from '@google/genai';
 import Constants from 'expo-constants';
 import { File } from 'expo-file-system';

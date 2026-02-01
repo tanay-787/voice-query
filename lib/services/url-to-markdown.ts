@@ -1,6 +1,6 @@
-import { ERROR_MESSAGES } from '@/lib/constants/limits';
-import { validateURL, validateMarkdownContent } from '@/lib/services/validation';
-import type { URLToMarkdownResponse } from '@/lib/types/api';
+import { ERROR_MESSAGES } from '@/constants/limits';
+import { validateMarkdownContent, validateURL } from '@/services/validation';
+import type { URLToMarkdownResponse } from '@/types/api';
 
 /**
  * URL to Markdown conversion service

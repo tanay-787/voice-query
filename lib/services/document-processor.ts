@@ -1,9 +1,9 @@
-import { ERROR_MESSAGES } from '@/lib/constants/limits';
-import { getAgentService } from '@/lib/services/agent';
-import { getGeminiService } from '@/lib/services/gemini';
-import { convertURLToMarkdown } from '@/lib/services/url-to-markdown';
-import { validatePDF } from '@/lib/services/validation';
-import type { DocumentContextInput, DocumentSummary } from '@/lib/types/context';
+import { ERROR_MESSAGES } from '@/constants/limits';
+import { getAgentService } from '@/services/agent';
+import { getGeminiService } from '@/services/gemini';
+import { convertURLToMarkdown } from '@/services/url-to-markdown';
+import { validatePDF } from '@/services/validation';
+import type { DocumentContextInput, DocumentSummary } from '@/types/context';
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 

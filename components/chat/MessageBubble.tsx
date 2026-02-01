@@ -3,7 +3,7 @@
  * Individual chat message bubble with user/assistant styling
  */
 
-import type { Message } from '@/lib/types/conversation';
+import type { Message } from '@/types/conversation';
 import { Surface } from 'heroui-native';
 import React from 'react';
 import { Text, View } from 'react-native';

@@ -1,4 +1,4 @@
-import { LIMITS } from '@/constants';
+import { LIMITS } from '@/constants/limits';
 import { z } from 'zod';
 
 /**
@@ -18,7 +18,6 @@ export const pdfFileSchema = z.object({
 });
 
 export const urlSchema = z
-  .string()
   .url('Please enter a valid URL')
   .refine(
     (url) => url.startsWith('http://') || url.startsWith('https://'),

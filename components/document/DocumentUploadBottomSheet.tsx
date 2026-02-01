@@ -7,9 +7,10 @@
  * @param documentContext - Document context from useDocumentContext hook (type inferred)
  */
 
-import type { useDocumentContext } from '@/lib/hooks/useDocumentContext';
-import type { useDocumentProcessor } from '@/lib/hooks/useDocumentProcessor';
-import { ErrorType, useErrorHandler } from '@/lib/hooks/useErrorHandler';
+import { ThemedIcon } from '@/components/ThemedIcon';
+import type { useDocumentContext } from '@/hooks/useDocumentContext';
+import type { useDocumentProcessor } from '@/hooks/useDocumentProcessor';
+import { ErrorType, useErrorHandler } from '@/hooks/useErrorHandler';
 import { useBottomSheetInternal } from '@gorhom/bottom-sheet';
 import * as DocumentPicker from 'expo-document-picker';
 import {
@@ -25,7 +26,6 @@ import React, { useCallback, useRef, useState } from 'react';
 import { findNodeHandle, Text, TextInput, View, type BlurEvent, type FocusEvent } from 'react-native';
 import Animated, { FadeInDown, FadeOutUp, LinearTransition } from 'react-native-reanimated';
 import { withUniwind } from 'uniwind';
-import { ThemedIcon } from '../ThemedIcon';
 
 const StyledText = withUniwind(Text);
 const AnimatedView = withUniwind(Animated.View);

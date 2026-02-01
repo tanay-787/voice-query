@@ -5,7 +5,7 @@
 
 export const LIMITS = {
   // PDF constraints
-  PDF_MAX_FILE_SIZE_BYTES: 2 * 1024 * 1024, // 2MB
+  PDF_MAX_FILE_SIZE_BYTES: 2097152, // 2MB
   PDF_MAX_FILE_SIZE_MB: 2,
 
   // URL constraints
@@ -16,7 +16,7 @@ export const LIMITS = {
 
   // Audio constraints
   AUDIO_MAX_DURATION_MS: 60_000, // 60 seconds max recording
-} as const;
+};
 
 export const ERROR_MESSAGES = {
   PDF_TOO_LARGE: `This PDF is too large for v1. Please upload a smaller document (max ${LIMITS.PDF_MAX_FILE_SIZE_MB}MB).`,
@@ -28,4 +28,4 @@ export const ERROR_MESSAGES = {
   AUDIO_TOO_LONG: "Recording too long. Please keep it under 60 seconds.",
   SUMMARY_FAILED: "Could not generate summary. Please try again.",
   ANSWER_NOT_FOUND: "I don't see that in this document.",
-} as const;
+};

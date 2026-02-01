@@ -1,4 +1,4 @@
-import { LIMITS } from '@/lib/constants/limits';
+import { LIMITS } from '@/constants/limits';
 import {
   RecordingPresets,
   requestRecordingPermissionsAsync,

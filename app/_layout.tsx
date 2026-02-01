@@ -1,10 +1,10 @@
-import '@/polyfills';
+import { DB_NAME, migrateDatabase } from '@/database/migrations';
 import { Stack } from "expo-router";
+import { SQLiteProvider } from 'expo-sqlite';
 import { HeroUINativeProvider } from "heroui-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { SQLiteProvider } from 'expo-sqlite';
-import { migrateDatabase, DB_NAME } from '@/lib/database/migrations';
 import "../global.css";
+import '../polyfills';
 
 export default function RootLayout() {
   return (

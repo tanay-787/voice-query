@@ -1,7 +1,7 @@
-import { QA_SYSTEM_PROMPT, QA_USER_PROMPT, SUMMARIZATION_PROMPT } from '@/lib/constants/agent-prompts';
-import { ERROR_MESSAGES } from '@/lib/constants/limits';
-import { parseJSONSafely, validateDocumentSummary } from '@/lib/services/validation';
-import type { DocumentSummary } from '@/lib/types/context';
+import { QA_SYSTEM_PROMPT, QA_SYSTEM_PROMPT_FOLLOWUP, QA_USER_PROMPT, QA_USER_PROMPT_FOLLOWUP, SUMMARIZATION_PROMPT } from '@/constants/agent-prompts';
+import { ERROR_MESSAGES } from '@/constants/limits';
+import { parseJSONSafely, validateDocumentSummary } from '@/services/validation';
+import type { DocumentSummary } from '@/types/context';
 import ModelClient, { isUnexpected } from "@azure-rest/ai-inference";
 import { AzureKeyCredential } from "@azure/core-auth";
 import Constants from 'expo-constants';
@@ -10,6 +10,11 @@ import Constants from 'expo-constants';
  * Agent Multimodal Service
  * Handles summarization and Q&A using Microsoft Agent-multimodal-instruct via GitHub Models
  */
+
+export interface ConversationMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
 
 // Use GITHUB_TOKEN from env/config
 const TOKEN = Constants.expoConfig?.extra?.GITHUB_TOKEN || process.env.GITHUB_TOKEN;
@@ -75,26 +80,61 @@ class AgentService {
   /**
    * Answer question based on context
    */
-  async answerQuestion(question: string, contextString: string): Promise<string> {
+  async answerQuestion(
+    question: string,
+    contextString: string,
+    conversationHistory?: ConversationMessage[]
+  ): Promise<string> {
     try {
       console.log('[Agent] Answering question...');
+      console.log('[Agent] Question:', question);
+      console.log('[Agent] Context length:', contextString?.length || 0, 'chars');
+      console.log('[Agent] Conversation history:', conversationHistory?.length || 0, 'messages');
+
+      // Check if this is a repetition request
+      if (conversationHistory && conversationHistory.length > 0 && this.isRepetitionRequest(question)) {
+        const lastResponse = this.getLastAssistantResponse(conversationHistory);
+        if (lastResponse) {
+          console.log('[Agent] Detected repetition request, returning previous response');
+          return lastResponse;
+        }
+      }
+
+      // Build messages array with conversation history
+      const messages: Array<{ role: string; content: string }> = [
+        { 
+          role: "system", 
+          content: conversationHistory && conversationHistory.length > 0 
+            ? QA_SYSTEM_PROMPT_FOLLOWUP 
+            : QA_SYSTEM_PROMPT
+        }
+      ];
+
+      // Add previous conversation history if available
+      if (conversationHistory && conversationHistory.length > 0) {
+        messages.push(...conversationHistory.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        })));
+      }
+
+      // Add current question with appropriate prompt
+      const userPromptContent = conversationHistory && conversationHistory.length > 0
+        ? QA_USER_PROMPT_FOLLOWUP(question, contextString)
+        : QA_USER_PROMPT(question, contextString);
+
+      messages.push({
+        role: "user",
+        content: userPromptContent
+      });
 
       const response = await this.client.path("/chat/completions").post({
         body: {
-          messages: [
-            { 
-              role: "system", 
-              content: QA_SYSTEM_PROMPT 
-            },
-            { 
-              role: "user", 
-              content: QA_USER_PROMPT(question, contextString)
-            }
-          ],
+          messages,
           model: MODEL_NAME,
-          temperature: 0.3, // Lower temperature to reduce hallucinations
-          max_tokens: 100,  // STRICT limit for conversational brevity (~60-80 words)
-          top_p: 0.9,       // Nucleus sampling for better quality
+          temperature: 0.3,
+          max_tokens: 100,
+          top_p: 0.9,
         }
       });
 
@@ -122,6 +162,32 @@ class AgentService {
       console.error('[Agent] Q&A failed:', error);
       throw new Error('Failed to generate answer');
     }
+  }
+
+  /**
+   * Check if question is asking for repetition
+   */
+  private isRepetitionRequest(question: string): boolean {
+    const repetitionKeywords = [
+      'repeat', 'say again', 'say that again', 'what did you say',
+      'can you repeat', 'repeat that', 'say it again', 'come again',
+      'pardon', 'sorry', 'didn\'t catch', 'clarify',
+      'explain that more', 'tell me again'
+    ];
+    const lowerQuestion = question.toLowerCase();
+    return repetitionKeywords.some(keyword => lowerQuestion.includes(keyword));
+  }
+
+  /**
+   * Get last assistant response from conversation history
+   */
+  private getLastAssistantResponse(conversationHistory: ConversationMessage[]): string | null {
+    for (let i = conversationHistory.length - 1; i >= 0; i--) {
+      if (conversationHistory[i].role === 'assistant') {
+        return conversationHistory[i].content;
+      }
+    }
+    return null;
   }
 
   /**

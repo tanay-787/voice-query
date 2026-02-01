@@ -1,13 +1,13 @@
 import { useState, useCallback } from 'react';
 import type { SQLiteDatabase } from 'expo-sqlite';
-import type { DocumentContextInput, FormattedContext } from '@/lib/types/context';
+import type { DocumentContextInput, FormattedContext } from '@/types/context';
 import {
   getContext,
   saveContext,
   deleteContext,
   hasContext,
   formatContextForPrompt,
-} from '@/lib/database/context-store';
+} from '@/database/context-store';
 
 /**
  * Hook to manage document context

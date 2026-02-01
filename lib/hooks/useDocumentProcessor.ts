@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import type { DocumentPickerResult } from 'expo-document-picker';
-import { processPDF, processURL, askQuestion, type ProcessingResult } from '@/lib/services/document-processor';
+import { processPDF, processURL, askQuestion, type ProcessingResult } from '@/services/document-processor';
 
 /**
  * Hook for document processing operations

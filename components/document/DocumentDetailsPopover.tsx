@@ -4,19 +4,17 @@
  * Wraps a trigger component (typically DocumentInfoTrigger)
  */
 
-import Ionicons from '@expo/vector-icons/Ionicons';
+import type { useDocumentContext } from '@/hooks/useDocumentContext';
+import type { FormattedContext } from '@/types/context';
+import { ThemedIcon } from '@/components/ThemedIcon';
 import { Button, Divider, Popover } from 'heroui-native';
 import React from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { withUniwind } from 'uniwind';
 
-import type { useDocumentContext } from '@/lib/hooks/useDocumentContext';
-import type { FormattedContext } from '@/lib/types/context';
-
 const StyledView = withUniwind(View);
 const StyledText = withUniwind(Text);
 const StyledScrollView = withUniwind(ScrollView);
-const StyledIonicons = withUniwind(Ionicons);
 
 interface DocumentDetailsPopoverProps {
   children: React.ReactNode; // Trigger component (e.g., DocumentInfoTrigger)
@@ -90,7 +88,7 @@ export function DocumentDetailsPopover({
               onPress={handleDelete}
               className="mt-2"
             >
-              <StyledIonicons name="trash-outline" size={20} className="text-white" />
+              <ThemedIcon name="trash-outline" size={20} themeColor="danger-foreground" />
               <Button.Label>Delete Document</Button.Label>
             </Button>
 

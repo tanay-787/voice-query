@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import type { DocumentContext, DocumentContextInput, FormattedContext } from '@/lib/types/context';
+import type { DocumentContext, DocumentContextInput, FormattedContext } from '@/types/context';
 
 /**
  * Context store - CRUD operations for single document context

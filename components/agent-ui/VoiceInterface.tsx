@@ -9,7 +9,7 @@
  * - Answering: Waveform at bottom, transcript at top
  */
 
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { ThemedIcon } from '@/components/ThemedIcon';
 import { useThemeColor } from 'heroui-native';
 import React from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
@@ -23,12 +23,11 @@ import Animated, {
 } from 'react-native-reanimated';
 import { withUniwind } from 'uniwind';
 
-import { AudioWave } from '@/components/agent-ui';
+import { AudioWave } from './AudioWave';
 
 const StyledView = withUniwind(View);
 const StyledText = withUniwind(Text);
 const StyledPressable = withUniwind(Pressable);
-const StyledIonicons = withUniwind(Ionicons);
 const AnimatedView = withUniwind(Animated.View);
 
 type VoiceState = 'idle' | 'listening' | 'processing' | 'answering';
@@ -53,7 +52,6 @@ export function VoiceInterface({
   disabled = false,
 }: VoiceInterfaceProps) {
   const [accentColor] = useThemeColor(['accent']);
-  const [mutedColor] = useThemeColor(['muted']);
 
   // Pulsing animation for processing state
   const pulseScale = useSharedValue(1);
@@ -133,10 +131,10 @@ export function VoiceInterface({
         >
           {/* Idle: Mic Icon */}
           {state === 'idle' && (
-            <StyledIonicons 
+            <ThemedIcon 
               name="mic" 
-              size={64} 
-              style={{ color: accentColor }} 
+              size={64}
+              themeColor="accent"
             />
           )}
 
@@ -172,7 +170,7 @@ export function VoiceInterface({
       {state === 'listening' && transcript && (
         <StyledView className="mt-4 px-6 w-full">
           <StyledText className="text-muted text-sm text-center italic">
-            "{transcript}"
+            &quot;{transcript}&quot;
           </StyledText>
         </StyledView>
       )}

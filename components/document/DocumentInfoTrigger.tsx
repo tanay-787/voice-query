@@ -4,7 +4,7 @@
  * Compatible with Popover.Trigger asChild pattern using forwardRef
  */
 
-import type { FormattedContext } from '@/lib/types/context';
+import type { FormattedContext } from '@/types/context';
 import { PressableFeedback } from 'heroui-native';
 import React from 'react';
 import { Text, View } from 'react-native';

@@ -3,7 +3,7 @@
  * Single-context storage - only one document at a time
  */
 
-export const DB_NAME = 'lock_pdf_url_agent.db';
+export const DB_NAME = 'vq_agent.db';
 export const DB_VERSION = 1;
 
 /**
