@@ -25,7 +25,7 @@ export default function IndexScreen() {
   const db = useSQLiteContext();
   const documentContext = useDocumentContext(db);
   const documentProcessor = useDocumentProcessor();
-  const { showError, showSuccess, handleError } = useErrorHandler();
+  const { handleError } = useErrorHandler();
 
   const azureConfig = getAzureSpeechConfig();
 
@@ -49,14 +49,15 @@ export default function IndexScreen() {
   
   useEffect(() => {
     documentContext.loadContext();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // documentContext is stable (hook object); initialization-only effect
 
   // Monitor voice interaction errors
   useEffect(() => {
     if (voiceInteraction.error) {
       handleError(voiceInteraction.error);
     }
-  }, [voiceInteraction.error]);
+  }, [voiceInteraction.error, handleError]);
 
   // Track voice messages
   useEffect(() => {
@@ -85,7 +86,8 @@ export default function IndexScreen() {
       );
       setMessages(prev => [...prev, assistantMessage]);
     }
-  }, [voiceInteraction.transcription, voiceInteraction.answer]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voiceInteraction.transcription, voiceInteraction.answer]); // messages intentionally omitted: stale closure prevents infinite loop from setMessages
 
   // Clear messages when document changes
   useEffect(() => {

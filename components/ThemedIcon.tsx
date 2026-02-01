@@ -29,7 +29,7 @@ export interface ThemedIconProps extends Omit<IoniconsProps, 'color'> {
    * @default 'foreground'
    * @example 'accent-foreground' | 'muted' | 'accent-soft-foreground'
    */
-  themeColor?: ThemeColor extends Array<infer U> ? U : ThemeColor;
+  themeColor?: ThemeColor extends (infer U)[] ? U : ThemeColor;
   
   /**
    * Optional override color (bypasses theme)

@@ -17,7 +17,6 @@ interface MessageBubbleProps {
 
 export function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === 'user';
-  const isVoice = message.type === 'voice';
 
   return (
     <View className={`w-full flex-row ${isUser ? 'justify-end' : 'justify-start'} mb-3`}>
@@ -56,19 +55,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   );
 }
 
-/**
- * Format duration in milliseconds to readable string
- * Example: 3500ms → "3s", 65000ms → "1m 5s"
- */
-function formatDuration(durationMs: number): string {
-  const seconds = Math.floor(durationMs / 1000);
-  if (seconds < 60) {
-    return `${seconds}s`;
-  }
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
-}
+
 
 /**
  * Format timestamp to readable time

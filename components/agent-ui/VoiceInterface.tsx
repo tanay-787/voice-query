@@ -69,7 +69,8 @@ export function VoiceInterface({
     } else {
       pulseScale.value = withTiming(1, { duration: 300 });
     }
-  }, [state]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]); // pulseScale is Reanimated useSharedValue (stable reference); doesn't trigger rerenders
 
   const pulseStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulseScale.value }],
@@ -195,7 +196,8 @@ function ProcessingDot({ delay }: { delay: number }) {
       -1,
       false
     );
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // opacity is Reanimated useSharedValue (stable reference); initialization-only effect
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,

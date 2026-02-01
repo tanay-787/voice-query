@@ -87,7 +87,6 @@ export function AudioWave({
     if (isActive) {
       // Animate each bar with different timing for organic feel
       bars.forEach((bar, index) => {
-        const delay = index * 100; // Stagger animation
         const duration = 800 + Math.random() * 400; // Randomize duration slightly
         
         bar.value = withRepeat(
@@ -111,7 +110,8 @@ export function AudioWave({
         bar.value = withTiming(0.3, { duration: 300 });
       });
     }
-  }, [isActive, barCount]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, barCount]); // bars is array of stable Reanimated useSharedValues; array identity stable across renders
 
   return (
     <View className="flex-row items-center justify-center gap-1.5" style={{ height: size }}>
