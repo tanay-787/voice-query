@@ -53,6 +53,22 @@ export function VoiceInterface({
 }: VoiceInterfaceProps) {
   const [accentColor] = useThemeColor(['accent']);
 
+  // State label
+  const getStateLabel = () => {
+    switch (state) {
+      case 'idle':
+        return 'Tap to speak';
+      case 'listening':
+        return 'Tap to stop';
+      case 'processing':
+        return 'Processing...';
+      case 'answering':
+        return 'Speaking...';
+      default:
+        return '';
+    }
+  };
+
   // Pulsing animation for processing state
   const pulseScale = useSharedValue(1);
 
@@ -76,22 +92,6 @@ export function VoiceInterface({
     transform: [{ scale: pulseScale.value }],
   }));
 
-  // State label
-  const getStateLabel = () => {
-    switch (state) {
-      case 'idle':
-        return 'Tap to speak';
-      case 'listening':
-        return 'Tap to stop';
-      case 'processing':
-        return 'Processing...';
-      case 'answering':
-        return 'Speaking...';
-      default:
-        return '';
-    }
-  };
-
   return (
     <StyledView className="flex-1 items-center justify-center px-6">
       {/* Answering State: Transcript at top */}
@@ -112,7 +112,7 @@ export function VoiceInterface({
       {/* Central Circle */}
       <StyledPressable
         onPress={onPress}
-        disabled={disabled || state === 'processing'}
+        disabled={disabled || state === 'processing' || state === 'answering'}
       >
         <AnimatedView 
           style={[
