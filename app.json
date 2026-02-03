@@ -41,7 +41,15 @@
         }
       ],
       "expo-audio",
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "react-native",
+          "organization": "tanay-personal"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

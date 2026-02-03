@@ -5,15 +5,25 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "SENTRY_AUTH_TOKEN": "@app.config"
+      }
     },
     "preview": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "SENTRY_AUTH_TOKEN": "@app.config"
       }
     },
-    "production": {}
+    "production": {
+      "env": {
+        "SENTRY_AUTH_TOKEN": "@app.config"
+      }
+    }
   },
   "submit": {
     "production": {}
