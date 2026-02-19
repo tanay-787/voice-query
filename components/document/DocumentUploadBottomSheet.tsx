@@ -95,7 +95,7 @@ function URLTextField({ url, onChangeText, isDisabled, hasError, errorMessage }:
       <View className="w-full flex-row items-center">
         <TextField.Input
           ref={inputRef}
-          className="flex-1 pl-[60px]"
+          className="flex-1 pl-[62px]"
           value={url}
           onChangeText={onChangeText}
           keyboardType="url"
@@ -207,7 +207,7 @@ export function DocumentUploadBottomSheet({
         showSuccess('Document Processed', 'PDF has been successfully analyzed');
       } else if (hasValidUrl) {
         // Process URL
-        const result = await documentProcessor.processURL(url);
+        const result = await documentProcessor.processURL(`https://${url}`);
         await documentContext.save(result.contextInput);
         showSuccess('Document Processed', 'URL content has been successfully analyzed');
       }
@@ -238,7 +238,7 @@ export function DocumentUploadBottomSheet({
     <BottomSheet isOpen={isOpen} onOpenChange={handleOpenChange}>
       <BottomSheet.Portal>
         <BottomSheet.Overlay />
-        <BottomSheet.Content keyboardBehavior="extend">
+        <BottomSheet.Content keyboardBehavior="interactive">
           <View className="mb-6">
             <BottomSheet.Title className="text-2xl font-bold">
               Provide Context
