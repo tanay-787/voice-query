@@ -1,23 +1,23 @@
 import {
-  ChatMessageList,
+  ChatHistoryBottomSheet,
   DocumentDetailsPopover,
   DocumentInfoTrigger,
   DocumentUploadBottomSheet,
   ThemedIcon,
-  VoiceInterface,
+  VoiceInterface
 } from '@/components';
 import { useDocumentContext, useDocumentProcessor, useErrorHandler, useVoiceInteraction } from '@/hooks';
 import { getAzureSpeechConfig } from '@/services/speech-to-text';
 import { createMessage, type Message } from '@/types/conversation';
 import { Stack } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
+import { Button } from 'heroui-native';
 import React, { useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { withUniwind } from 'uniwind';
 
 const StyledView = withUniwind(View);
 const StyledText = withUniwind(Text);
-const StyledPressable = withUniwind(Pressable);
 
 type VoiceState = 'idle' | 'listening' | 'processing' | 'answering';
 
@@ -43,6 +43,9 @@ export default function IndexScreen() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
 
+  // Reset conversation history
+  const handleResetHistory = () => setMessages([]);
+
   // ========================================================================
   // LIFECYCLE
   // ========================================================================
@@ -52,12 +55,19 @@ export default function IndexScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // documentContext is stable (hook object); initialization-only effect
 
-  // Monitor voice interaction errors
+  // Monitor voice interaction errors (prevent infinite toast loop)
+  const [lastVoiceError, setLastVoiceError] = useState<string | null>(null);
   useEffect(() => {
     if (voiceInteraction.error) {
-      handleError(voiceInteraction.error);
+      console.log('[VoiceError]', voiceInteraction.error.message, new Date().toISOString());
+      if (voiceInteraction.error.message !== lastVoiceError) {
+        handleError(voiceInteraction.error);
+        setLastVoiceError(voiceInteraction.error.message);
+      }
+    } else if (lastVoiceError) {
+      setLastVoiceError(null);
     }
-  }, [voiceInteraction.error, handleError]);
+  }, [voiceInteraction.error, handleError, lastVoiceError]);
 
   // Track voice messages
   useEffect(() => {
@@ -143,43 +153,40 @@ export default function IndexScreen() {
       
       <StyledView className="flex-1 bg-surface pb-safe-offset-3">
         {/* Top Bar: Chat History Button */}
-        <StyledView className="absolute top-12 right-6 z-10">
-          <StyledPressable
+        <StyledView className="absolute top-12 flex-row w-full items-center justify-between z-10">
+          <StyledText className='text-4xl text-foreground left-6 pb-1'>VoiceQuery</StyledText>
+          <Button
+            isIconOnly
+            variant='secondary'
+            className='bg-background right-6'
             onPress={() => setIsHistoryOpen(!isHistoryOpen)}
-            className="bg-background rounded-full p-3 shadow-sm"
+
           >
             <ThemedIcon 
               name={isHistoryOpen ? "close" : "chatbubbles"} 
               size={24}
               themeColor="foreground"
             />
-          </StyledPressable>
+          </Button>
         </StyledView>
 
-        {/* Main Content: Central Voice Circle or Chat History */}
-        {isHistoryOpen ? (
-          <StyledView className="flex-1 pt-20">
-            <StyledView className="px-6 pb-4">
-              <StyledText className="text-foreground text-2xl font-bold">
-                Chat History
-              </StyledText>
-              {documentContext.context && (
-                <StyledText className="text-muted text-sm mt-1">
-                  {documentContext.context.title || 'Untitled Document'}
-                </StyledText>
-              )}
-            </StyledView>
-            <ChatMessageList messages={messages} isLoading={false} />
-          </StyledView>
-        ) : (
-          <VoiceInterface
-            state={voiceState}
-            transcript={voiceInteraction.transcription}
-            answer={voiceInteraction.answer}
-            onPress={handleVoicePress}
-            disabled={voiceInteraction.isProcessing}
-          />
-        )}
+        {/* Main Content: Central Voice Circle */}
+        <VoiceInterface
+          state={voiceState}
+          transcript={voiceInteraction.transcription}
+          answer={voiceInteraction.answer}
+          onPress={handleVoicePress}
+          disabled={voiceInteraction.isProcessing}
+        />
+
+        {/* Conversation History BottomSheet */}
+        <ChatHistoryBottomSheet
+          isOpen={isHistoryOpen}
+          onOpenChange={setIsHistoryOpen}
+          messages={messages}
+          documentTitle={documentContext.context?.title || 'Untitled Document'}
+          onResetHistory={handleResetHistory}
+        />
 
         {/* Document Info Footer (only when idle and has context) */}
         {voiceState === 'idle' && documentContext.context && !isHistoryOpen && (

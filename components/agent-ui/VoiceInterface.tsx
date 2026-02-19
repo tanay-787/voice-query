@@ -10,9 +10,9 @@
  */
 
 import { ThemedIcon } from '@/components/ThemedIcon';
-import { useThemeColor } from 'heroui-native';
+import { PressableFeedback, useThemeColor } from 'heroui-native';
 import React from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -27,7 +27,6 @@ import { AudioWave } from './AudioWave';
 
 const StyledView = withUniwind(View);
 const StyledText = withUniwind(Text);
-const StyledPressable = withUniwind(Pressable);
 const AnimatedView = withUniwind(Animated.View);
 
 type VoiceState = 'idle' | 'listening' | 'processing' | 'answering';
@@ -110,9 +109,10 @@ export function VoiceInterface({
       )}
 
       {/* Central Circle */}
-      <StyledPressable
+      <PressableFeedback
         onPress={onPress}
-        disabled={disabled || state === 'processing' || state === 'answering'}
+        isDisabled={disabled || state === 'processing' || state === 'answering'}
+        
       >
         <AnimatedView 
           style={[
@@ -134,7 +134,7 @@ export function VoiceInterface({
           {state === 'idle' && (
             <ThemedIcon 
               name="mic" 
-              size={64}
+              size={85}
               themeColor="accent"
             />
           )}
@@ -158,7 +158,7 @@ export function VoiceInterface({
             <AudioWave isActive={true} size={100} barCount={5} />
           )}
         </AnimatedView>
-      </StyledPressable>
+      </PressableFeedback>
 
       {/* State Label */}
       <StyledView className="mt-6">

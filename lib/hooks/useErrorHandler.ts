@@ -216,6 +216,9 @@ export function useErrorHandler() {
    * @returns Detected error type
    */
   const parseErrorType = useCallback((error: unknown): ErrorType => {
+    if (error instanceof Error) {
+      // no debug log
+    }
     if (!(error instanceof Error)) {
       return ErrorType.UNKNOWN_ERROR;
     }

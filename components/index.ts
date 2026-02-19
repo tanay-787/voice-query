@@ -7,7 +7,7 @@ export { ThemedIcon, ThemedIconVariants } from './ThemedIcon';
 export type { ThemedIconProps } from './ThemedIcon';
 
 // Chat Components
-export { ChatMessageList, MessageBubble } from './chat';
+export { ChatHistoryBottomSheet, ChatMessageList, MessageBubble } from './chat';
 
 // Agent UI Components
 export { VoiceInterface } from './agent-ui';

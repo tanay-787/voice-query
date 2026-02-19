@@ -6,6 +6,7 @@
 import type { Message } from '@/types/conversation';
 import React, { useEffect, useRef } from 'react';
 import { FlatList, Text, View, type ListRenderItem } from 'react-native';
+import { BottomSheet } from 'heroui-native';
 import { withUniwind } from 'uniwind';
 import { MessageBubble } from './MessageBubble';
 
@@ -34,9 +35,9 @@ export function ChatMessageList({ messages, isLoading }: ChatMessageListProps) {
   );
 
   const renderEmpty = () => (
-    <View className="flex-1 items-center justify-center p-8">
+    <View className="flex-1 items-center justify-center p-2">
       <StyledText className="text-center text-muted text-base">
-        Start a conversation by asking a question about your document
+        Start a conversation by asking questions about your document
       </StyledText>
     </View>
   );
@@ -53,12 +54,14 @@ export function ChatMessageList({ messages, isLoading }: ChatMessageListProps) {
     );
   };
 
+  // Use BottomSheet.FlatList if available (for bottom sheet context)
+  const SheetFlatList = (BottomSheet as any).FlatList || FlatList;
   return (
-    <FlatList
+    <SheetFlatList
       ref={flatListRef}
       data={messages}
       renderItem={renderMessage}
-      keyExtractor={(item) => item.id}
+      keyExtractor={(item: { id: any; }) => item.id}
       contentContainerClassName="p-4"
       ListEmptyComponent={renderEmpty}
       ListFooterComponent={renderFooter}

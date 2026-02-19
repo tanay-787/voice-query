@@ -8,7 +8,7 @@ node_modules/
 dist/
 web-build/
 expo-env.d.ts
-
+.github
 # Native
 .kotlin/
 *.orig.*
@@ -44,3 +44,5 @@ app-example
 
 .llms/
 .env.local
+# heroui-agents-md
+.heroui-docs/

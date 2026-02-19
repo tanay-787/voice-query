@@ -80,13 +80,8 @@ export function useSpeechToText(azureConfig: AzureSpeechConfig | null) {
       
       console.log('[STT] Azure result:', result);
       
-      // Check if no phrases detected (user was silent or background noise only)
-      if (!result.phrases || result.phrases.length === 0) {
-        throw new Error('No speech detected. Please speak clearly and try again.');
-      }
-      
-      // Check if DisplayText is empty (no recognizable speech)
-      if (!result.DisplayText || result.DisplayText.trim() === '') {
+      // Check if no recognizable speech (user was silent or background noise only)
+      if ((!result.phrases || result.phrases.length === 0) || (!result.DisplayText || result.DisplayText.trim() === '')) {
         throw new Error('No speech detected. Please speak clearly and try again.');
       }
       

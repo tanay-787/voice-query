@@ -47,7 +47,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         </Surface>
 
         {/* Timestamp */}
-        <StyledText className="text-xs text-muted mt-1 px-1">
+        <StyledText className="text-xs text-muted mt-1 px-2">
           {formatTimestamp(message.timestamp)}
         </StyledText>
       </View>
