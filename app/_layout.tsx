@@ -1,6 +1,7 @@
 import { DB_NAME, migrateDatabase } from '@/database/migrations';
 import { Stack } from "expo-router";
 import { SQLiteProvider } from 'expo-sqlite';
+import { GlobalAudioPlayersProvider } from '@/hooks/useGlobalAudioPlayers';
 import { HeroUINativeProvider } from "heroui-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "../global.css";
@@ -25,12 +26,14 @@ export default Sentry.wrap(function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <HeroUINativeProvider>
-        <SQLiteProvider 
-          databaseName={DB_NAME} 
-          onInit={migrateDatabase}
-        >
-          <Stack />
-        </SQLiteProvider>
+        <GlobalAudioPlayersProvider>
+          <SQLiteProvider 
+            databaseName={DB_NAME} 
+            onInit={migrateDatabase}
+          >
+            <Stack />
+          </SQLiteProvider>
+        </GlobalAudioPlayersProvider>
       </HeroUINativeProvider>
     </GestureHandlerRootView>
   );

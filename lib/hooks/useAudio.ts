@@ -65,7 +65,6 @@ export function useTextToSpeech() {
  */
 export function useSpeechToText(azureConfig: AzureSpeechConfig | null) {
   const [isTranscribing, setIsTranscribing] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
 
   const transcribe = useCallback(async (audioUri: string): Promise<string> => {
     if (!azureConfig) {
@@ -73,7 +72,6 @@ export function useSpeechToText(azureConfig: AzureSpeechConfig | null) {
     }
 
     setIsTranscribing(true);
-    setError(null);
 
     try {
       const result = await recognizeSpeech(audioUri, azureConfig);
@@ -92,9 +90,8 @@ export function useSpeechToText(azureConfig: AzureSpeechConfig | null) {
       
       return result.DisplayText;
     } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to transcribe audio');
-      setError(error);
-      throw error;
+      // Let errors bubble up to caller; don't manage error state here
+      throw err instanceof Error ? err : new Error('Failed to transcribe audio');
     } finally {
       setIsTranscribing(false);
     }
@@ -103,7 +100,6 @@ export function useSpeechToText(azureConfig: AzureSpeechConfig | null) {
   return {
     transcribe,
     isTranscribing,
-    error,
   };
 }
 

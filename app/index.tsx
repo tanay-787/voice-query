@@ -12,7 +12,7 @@ import { createMessage, type Message } from '@/types/conversation';
 import { Stack } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Button } from 'heroui-native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Text, View } from 'react-native';
 import { withUniwind } from 'uniwind';
 
@@ -56,18 +56,22 @@ export default function IndexScreen() {
   }, []); // documentContext is stable (hook object); initialization-only effect
 
   // Monitor voice interaction errors (prevent infinite toast loop)
-  const [lastVoiceError, setLastVoiceError] = useState<string | null>(null);
+  // Use a ref to track the last error message to avoid duplicate toasts
+  const lastErrorRef = useRef<string | null>(null);
+  
   useEffect(() => {
     if (voiceInteraction.error) {
       console.log('[VoiceError]', voiceInteraction.error.message, new Date().toISOString());
-      if (voiceInteraction.error.message !== lastVoiceError) {
+      // Only show error if message changed
+      if (voiceInteraction.error.message !== lastErrorRef.current) {
         handleError(voiceInteraction.error);
-        setLastVoiceError(voiceInteraction.error.message);
+        lastErrorRef.current = voiceInteraction.error.message;
       }
-    } else if (lastVoiceError) {
-      setLastVoiceError(null);
+    } else {
+      lastErrorRef.current = null;
     }
-  }, [voiceInteraction.error, handleError, lastVoiceError]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voiceInteraction.error]); // Only track error object changes
 
   // Track voice messages
   useEffect(() => {
@@ -117,15 +121,12 @@ export default function IndexScreen() {
     }
 
     // Start voice interaction
-    try {
-      if (!voiceInteraction.isRecording && !voiceInteraction.isProcessing) {
-        await voiceInteraction.startVoiceQuestion();
-      } else if (voiceInteraction.isRecording) {
-        await voiceInteraction.stopAndProcess();
-      }
-    } catch (error) {
-      handleError(error as Error);
+    if (!voiceInteraction.isRecording && !voiceInteraction.isProcessing) {
+      await voiceInteraction.startVoiceQuestion();
+    } else if (voiceInteraction.isRecording) {
+      await voiceInteraction.stopAndProcess();
     }
+    // Errors are handled by the useEffect that monitors voiceInteraction.error
   };
 
   const getVoiceState = (): VoiceState => {
@@ -159,7 +160,9 @@ export default function IndexScreen() {
             isIconOnly
             variant='secondary'
             className='bg-background right-6'
-            onPress={() => setIsHistoryOpen(!isHistoryOpen)}
+            onPress={() => {
+              setIsHistoryOpen(!isHistoryOpen);
+            }}
 
           >
             <ThemedIcon 

@@ -7,7 +7,7 @@
 import type { FormattedContext } from '@/types/context';
 import { PressableFeedback } from 'heroui-native';
 import React from 'react';
-import { Text, View } from 'react-native';
+import { GestureResponderEvent, Text, View } from 'react-native';
 import { withUniwind } from 'uniwind';
 
 const StyledView = withUniwind(View);
@@ -21,12 +21,14 @@ interface DocumentInfoTriggerProps {
  * Using forwardRef to make it compatible with Popover.Trigger asChild
  * The Popover.Trigger will pass onPress and other props to this component
  */
-export const DocumentInfoTrigger = React.forwardRef<View, DocumentInfoTriggerProps & { onPress?: () => void }>(
+export const DocumentInfoTrigger = React.forwardRef<View, DocumentInfoTriggerProps & { onPress?: (e?: GestureResponderEvent) => void }>(
   ({ context, onPress, ...props }, ref) => {
     return (
       <PressableFeedback
         ref={ref as any}
-        onPress={onPress}
+        onPress={e => {
+          onPress?.(e);
+        }}
         className="bg-background rounded-2xl shadow-sm"
         {...props}
       >

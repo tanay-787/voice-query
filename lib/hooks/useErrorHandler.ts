@@ -5,6 +5,7 @@
  */
 
 import { useToast } from 'heroui-native';
+import { useSoundEffect } from '@/hooks/useSoundEffect';
 import { useCallback } from 'react';
 
 /**
@@ -130,6 +131,7 @@ const ERROR_CONFIGS: Record<ErrorType, ErrorConfig> = {
  */
 export function useErrorHandler() {
   const { toast } = useToast();
+  const { play } = useSoundEffect();
 
   /**
    * Show error toast with optional retry action
@@ -139,7 +141,7 @@ export function useErrorHandler() {
    * @param onRetry - Optional callback for retry action
    * @param customMessage - Optional custom message override
    */
-  const showError = useCallback(
+const showError = useCallback(
     (
       errorType: ErrorType,
       error?: unknown,
@@ -147,6 +149,9 @@ export function useErrorHandler() {
       customMessage?: string
     ) => {
       const config = ERROR_CONFIGS[errorType];
+
+      // Play error sound
+      play('error');
 
       // Log error to console for debugging
       console.error(
@@ -169,7 +174,7 @@ export function useErrorHandler() {
           : undefined,
       });
     },
-    [toast]
+    [toast, play]
   );
 
   /**
