@@ -1,0 +1,9 @@
+packages:
+  - '.'
+  - 'backend'
+
+allowBuilds:
+  '@google/genai': true
+  '@sentry/cli': false
+  protobufjs: true
+  unrs-resolver: true

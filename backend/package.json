@@ -1,0 +1,10 @@
+{
+  "name": "@voice-query/backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "VoiceQuery Intelligence Backend powered by Azure AI Foundry",
+  "scripts": {
+    "dev": "python3 app.py",
+    "start": "python3 app.py"
+  }
+}

@@ -1,13 +1,17 @@
 {
-  "name": "my-ai",
+  "name": "@voice-query/mobile",
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
+    "dev": "concurrently -n \"BACKEND,MOBILE\" -c \"blue,green\" \"pnpm backend:dev\" \"pnpm start\"",
+    "backend:dev": "pnpm --filter @voice-query/backend dev",
+    "backend:start": "pnpm --filter @voice-query/backend start",
     "start": "expo start --tunnel",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "prepare": "husky"
   },
   "dependencies": {
     "@azure-rest/ai-inference": "^1.0.0-beta.6",
@@ -62,9 +66,13 @@
     "zod": "^4.3.4"
   },
   "devDependencies": {
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
     "@types/react": "~19.1.10",
+    "concurrently": "^10.0.5",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
+    "husky": "^9.1.7",
     "typescript": "~5.9.2"
   },
   "private": true
