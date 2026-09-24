@@ -46,8 +46,8 @@ export function useDocumentProcessor() {
     setError(null);
 
     try {
-      const answer = await askQuestion(question, contextString);
-      return answer;
+      const response = await askQuestion(question, contextString);
+      return response.answer;
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Question processing failed');
       setError(error);

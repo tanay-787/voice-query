@@ -36,6 +36,7 @@ interface VoiceInterfaceProps {
   state: VoiceState;
   transcript?: string;
   answer?: string;
+  citationPage?: number | null;
   onPress: () => void;
   disabled?: boolean;
 }
@@ -48,6 +49,7 @@ export function VoiceInterface({
   state,
   transcript = '',
   answer = '',
+  citationPage,
   onPress,
   disabled = false,
 }: VoiceInterfaceProps) {
@@ -94,13 +96,21 @@ export function VoiceInterface({
 
   return (
     <StyledView className="flex-1 items-center justify-center px-6">
-      {/* Answering State: Transcript at top */}
+      {/* Answering State: Transcript at top with Page Citation Badge */}
       {state === 'answering' && answer && (
-        <StyledView className="mb-8 w-full max-h-64">
+        <StyledView className="mb-6 w-full max-h-64 items-center">
+          {citationPage && (
+            <StyledView className="flex-row items-center gap-1.5 bg-accent/15 px-3.5 py-1 rounded-full mb-3">
+              <ThemedIcon name="document-text" size={13} themeColor="accent" />
+              <StyledText className="text-accent text-xs font-semibold tracking-wide">
+                Referenced: Page {citationPage}
+              </StyledText>
+            </StyledView>
+          )}
           <ScrollView 
             className="w-full" 
             showsVerticalScrollIndicator={true}
-            contentContainerStyle={{ paddingVertical: 16 }}
+            contentContainerStyle={{ paddingVertical: 8 }}
           >
             <StyledText className="text-foreground text-base leading-relaxed text-center">
               {answer}

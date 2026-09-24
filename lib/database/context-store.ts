@@ -41,8 +41,8 @@ export async function saveContext(
     await db.withTransactionAsync(async () => {
       await db.runAsync(
         `INSERT OR REPLACE INTO document_context 
-         (id, title, source, source_uri, overview, key_points, definitions, created_at, updated_at)
-         VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, title, source, source_uri, overview, key_points, definitions, backend_doc_id, spoken_briefing, page_count, created_at, updated_at)
+         VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           input.title,
           input.source,
@@ -50,6 +50,9 @@ export async function saveContext(
           input.overview,
           JSON.stringify(input.key_points),
           JSON.stringify(input.definitions),
+          input.backend_doc_id ?? null,
+          input.spoken_briefing ?? null,
+          input.page_count ?? 1,
           now,
           now,
         ]
@@ -106,6 +109,9 @@ function formatContext(row: DocumentContext): FormattedContext {
     overview: row.overview,
     keyPoints: JSON.parse(row.key_points),
     definitions: JSON.parse(row.definitions),
+    backendDocId: row.backend_doc_id ?? undefined,
+    spokenBriefing: row.spoken_briefing ?? undefined,
+    pageCount: row.page_count ?? 1,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   };

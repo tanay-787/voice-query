@@ -1,4 +1,4 @@
-import { getAgentService } from '@/services/agent';
+import { askQuestion } from '@/services/document-processor';
 import { requestAudioPermissions, setupAudioMode, validateRecordingDuration } from '@/services/audio-recording';
 import { AzureSpeechConfig, recognizeSpeech } from '@/services/speech-to-text';
 import { getTTSService, type TTSOptions } from '@/services/text-to-speech';
@@ -110,7 +110,8 @@ export function useSpeechToText(azureConfig: AzureSpeechConfig | null) {
 export function useVoiceInteraction(
   contextString: string | null,
   voiceIdentifier?: string,
-  azureConfig: AzureSpeechConfig | null = null
+  azureConfig: AzureSpeechConfig | null = null,
+  docId?: string
 ) {
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder);
@@ -119,11 +120,10 @@ export function useVoiceInteraction(
   
   const [transcription, setTranscription] = useState<string>('');
   const [answer, setAnswer] = useState<string>('');
+  const [citation, setCitation] = useState<{ page: number } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [conversationHistory, setConversationHistory] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
-  
-  const agent = getAgentService();
 
   // Setup permissions and audio mode on mount
   useEffect(() => {
@@ -185,10 +185,14 @@ export function useVoiceInteraction(
         throw new Error('No context available');
       }
 
-      // Get answer
-      console.log('[VoiceInteraction] Getting answer...');
-      const answerText = await agent.answerQuestion(transcribedText, contextString, conversationHistory);
+      // Get answer from backend intelligence engine
+      console.log('[VoiceInteraction] Getting answer from backend...');
+      const response = await askQuestion(transcribedText, contextString, docId, conversationHistory);
+      const answerText = response.answer;
       setAnswer(answerText);
+      if (response.citation) {
+        setCitation(response.citation);
+      }
 
       // Update conversation history
       setConversationHistory(prev => [
@@ -208,7 +212,7 @@ export function useVoiceInteraction(
       setError(error);
       throw error;
     }
-  }, [contextString, recorder, recorderState, stt, agent, tts, voiceIdentifier]);
+  }, [contextString, recorder, recorderState, stt, tts, voiceIdentifier, docId, conversationHistory]);
 
   const cancel = useCallback(async () => {
     if (recorderState.isRecording) {
@@ -218,12 +222,14 @@ export function useVoiceInteraction(
     setIsProcessing(false);
     setTranscription('');
     setAnswer('');
+    setCitation(null);
     setError(null);
   }, [recorder, recorderState, tts]);
 
   // Reset conversation history when context changes
   useEffect(() => {
     setConversationHistory([]);
+    setCitation(null);
   }, [contextString]);
 
   return {
@@ -235,14 +241,16 @@ export function useVoiceInteraction(
     duration: recorderState.durationMillis,
     transcription,
     answer,
+    citation,
     error,
     conversationHistory,
     
     // Actions
-    getVoices: tts.getVoices, // Expose getVoices directly
+    getVoices: tts.getVoices,
     startVoiceQuestion,
     stopAndProcess,
     cancel,
     stopSpeaking: tts.stop,
+    speakText: tts.speak,
   };
 }

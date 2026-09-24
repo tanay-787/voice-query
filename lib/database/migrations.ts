@@ -31,15 +31,35 @@ export async function migrateDatabase(db: SQLite.SQLiteDatabase): Promise<void> 
       await migrateToV1(db);
     }
 
-    // Add future migrations here
-    // if (currentVersion < 2) {
-    //   await migrateToV2(db);
-    // }
+    if (currentVersion < 2) {
+      await migrateToV2(db);
+    }
 
     console.log('[Migration] Database up to date');
   } catch (error) {
     console.error('[Migration] Failed:', error);
     throw error;
+  }
+}
+
+/**
+ * Migration to version 2 - add backend_doc_id, spoken_briefing, page_count
+ */
+async function migrateToV2(db: SQLite.SQLiteDatabase): Promise<void> {
+  console.log('[Migration] Migrating to v2...');
+  try {
+    await db.execAsync(`
+      BEGIN TRANSACTION;
+      ALTER TABLE document_context ADD COLUMN backend_doc_id TEXT;
+      ALTER TABLE document_context ADD COLUMN spoken_briefing TEXT;
+      ALTER TABLE document_context ADD COLUMN page_count INTEGER;
+      PRAGMA user_version = 2;
+      COMMIT;
+    `);
+    console.log('[Migration] Successfully migrated to v2');
+  } catch (e) {
+    console.log('[Migration] v2 migration note (columns may already exist):', e);
+    await db.execAsync('PRAGMA user_version = 2;');
   }
 }
 

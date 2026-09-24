@@ -4,7 +4,7 @@
  */
 
 export const DB_NAME = 'vq_agent.db';
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 /**
  * SQL schema for document_context table
@@ -19,6 +19,9 @@ CREATE TABLE IF NOT EXISTS document_context (
   overview TEXT NOT NULL,
   key_points TEXT NOT NULL,
   definitions TEXT NOT NULL,
+  backend_doc_id TEXT,
+  spoken_briefing TEXT,
+  page_count INTEGER,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );

@@ -32,7 +32,8 @@ export default function IndexScreen() {
   const voiceInteraction = useVoiceInteraction(
     documentContext.context ? documentContext.getPromptContext() : null,
     undefined,
-    azureConfig
+    azureConfig,
+    documentContext.context?.backendDocId
   );
 
   // ========================================================================
@@ -54,6 +55,18 @@ export default function IndexScreen() {
     documentContext.loadContext();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // documentContext is stable (hook object); initialization-only effect
+
+  // Play proactive spoken audio briefing when a document is ingested
+  const lastBriefingDocIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const doc = documentContext.context;
+    if (doc?.spokenBriefing && doc?.backendDocId && doc.backendDocId !== lastBriefingDocIdRef.current) {
+      lastBriefingDocIdRef.current = doc.backendDocId;
+      console.log('[ProactiveBriefing] Playing spoken executive briefing for:', doc.title);
+      voiceInteraction.speakText(doc.spokenBriefing);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documentContext.context?.backendDocId, documentContext.context?.spokenBriefing]);
 
   // Monitor voice interaction errors (prevent infinite toast loop)
   // Use a ref to track the last error message to avoid duplicate toasts
@@ -178,6 +191,7 @@ export default function IndexScreen() {
           state={voiceState}
           transcript={voiceInteraction.transcription}
           answer={voiceInteraction.answer}
+          citationPage={voiceInteraction.citation?.page}
           onPress={handleVoicePress}
           disabled={voiceInteraction.isProcessing}
         />

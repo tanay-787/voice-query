@@ -1,7 +1,5 @@
-import { ERROR_MESSAGES } from '@/constants/limits';
+import { uploadPDFToBackend, ingestURLToBackend, queryDocumentBackend, type BackendDocument } from '@/services/api-client';
 import { getAgentService } from '@/services/agent';
-import { getGeminiService } from '@/services/gemini';
-import { convertURLToMarkdown } from '@/services/url-to-markdown';
 import { validatePDF } from '@/services/validation';
 import type { DocumentContextInput, DocumentSummary } from '@/types/context';
 import * as DocumentPicker from 'expo-document-picker';
@@ -9,16 +7,18 @@ import { File } from 'expo-file-system';
 
 /**
  * Document processing orchestrator
- * Handles PDF upload and URL ingestion end-to-end
+ * Connects to the Azure AI Foundry Intelligence Backend
  */
 
 export type ProcessingResult = {
   contextInput: DocumentContextInput;
   summary: DocumentSummary;
+  spokenBriefing?: string;
+  backendDocId?: string;
 };
 
 /**
- * Process PDF document
+ * Process PDF document via backend intelligence engine
  */
 export async function processPDF(
   pickerResult: DocumentPicker.DocumentPickerResult
@@ -30,79 +30,101 @@ export async function processPDF(
   const asset = pickerResult.assets[0];
   const fileUri = asset.uri;
 
-  // Get file info for validation using new API
+  // Validate PDF file exists and size
   const file = new File(fileUri);
-  
   if (!file.exists) {
     throw new Error('File not found');
   }
 
-  // Validate PDF
   validatePDF({
     uri: fileUri,
     size: file.size,
     mimeType: 'application/pdf',
   });
 
-  console.log('[DocumentProcessor] Processing PDF:', asset.name);
-
-  const gemini = getGeminiService();
+  console.log('[DocumentProcessor] Uploading PDF to backend:', asset.name);
 
   try {
-    // Read PDF as base64
-    const pdfBase64 = await file.base64();
+    const backendDoc: BackendDocument = await uploadPDFToBackend(
+      fileUri,
+      asset.name || 'document.pdf'
+    );
 
-    // Generate summary using Gemini with inline PDF data
-    // This is more efficient and accurate than text extraction
-    const summary = await gemini.summarize({
-      inlineData: {
-        mimeType: 'application/pdf',
-        data: pdfBase64
-      }
-    });
+    const keyPoints = backendDoc.key_takeaways.map((k) => 
+      k.page ? `[Page ${k.page}] ${k.point}` : k.point
+    );
+    const definitions = backendDoc.definitions.map((d) => `${d.term}: ${d.definition}`);
 
     const contextInput: DocumentContextInput = {
-      title: summary.title || asset.name || 'PDF Document',
+      title: backendDoc.title || asset.name || 'PDF Document',
       source: 'pdf',
       source_uri: fileUri,
-      overview: summary.overview,
-      key_points: summary.key_points,
-      definitions: summary.definitions,
+      overview: backendDoc.overview,
+      key_points: keyPoints,
+      definitions: definitions,
+      backend_doc_id: backendDoc.id,
+      spoken_briefing: backendDoc.spoken_briefing,
+      page_count: backendDoc.page_count,
     };
 
-    return { contextInput, summary };
+    const summary: DocumentSummary = {
+      title: backendDoc.title,
+      overview: backendDoc.overview,
+      key_points: keyPoints,
+      definitions: definitions,
+    };
+
+    return {
+      contextInput,
+      summary,
+      spokenBriefing: backendDoc.spoken_briefing,
+      backendDocId: backendDoc.id,
+    };
   } catch (error) {
-    console.error('[DocumentProcessor] PDF processing failed:', error);
+    console.error('[DocumentProcessor] Backend PDF processing failed:', error);
     throw error;
   }
 }
 
 /**
- * Process URL
+ * Process URL via backend intelligence engine
  */
 export async function processURL(url: string): Promise<ProcessingResult> {
-  console.log('[DocumentProcessor] Processing URL:', url);
+  console.log('[DocumentProcessor] Ingesting URL via backend:', url);
 
   try {
-    // Convert URL to Markdown
-    const { markdown, title: urlTitle } = await convertURLToMarkdown(url);
+    const backendDoc: BackendDocument = await ingestURLToBackend(url);
 
-    // Generate summary from markdown
-    const agent = getAgentService();
-    const summary = await agent.summarize(markdown);
+    const keyPoints = backendDoc.key_takeaways.map((k) => k.point);
+    const definitions = backendDoc.definitions.map((d) => `${d.term}: ${d.definition}`);
 
     const contextInput: DocumentContextInput = {
-      title: summary.title || urlTitle || 'Web Page',
+      title: backendDoc.title || 'Web Page',
       source: 'url',
       source_uri: url,
-      overview: summary.overview,
-      key_points: summary.key_points,
-      definitions: summary.definitions,
+      overview: backendDoc.overview,
+      key_points: keyPoints,
+      definitions: definitions,
+      backend_doc_id: backendDoc.id,
+      spoken_briefing: backendDoc.spoken_briefing,
+      page_count: backendDoc.page_count,
     };
 
-    return { contextInput, summary };
+    const summary: DocumentSummary = {
+      title: backendDoc.title,
+      overview: backendDoc.overview,
+      key_points: keyPoints,
+      definitions: definitions,
+    };
+
+    return {
+      contextInput,
+      summary,
+      spokenBriefing: backendDoc.spoken_briefing,
+      backendDocId: backendDoc.id,
+    };
   } catch (error) {
-    console.error('[DocumentProcessor] URL processing failed:', error);
+    console.error('[DocumentProcessor] Backend URL processing failed:', error);
     throw error;
   }
 }
@@ -112,12 +134,23 @@ export async function processURL(url: string): Promise<ProcessingResult> {
  */
 export async function askQuestion(
   question: string,
-  contextString: string
-): Promise<string> {
-  if (!contextString) {
-    throw new Error(ERROR_MESSAGES.NO_CONTEXT);
-  }
+  contextString: string,
+  docId?: string,
+  conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>
+): Promise<{ answer: string; citation?: { page: number } }> {
+  try {
+    if (docId) {
+      console.log('[DocumentProcessor] Querying backend engine for doc:', docId);
+      return await queryDocumentBackend(docId, question, conversationHistory);
+    }
 
-  const agent = getAgentService();
-  return await agent.answerQuestion(question, contextString);
+    // Fallback to client agent if docId not present
+    console.log('[DocumentProcessor] Querying fallback agent...');
+    const agent = getAgentService();
+    const answer = await agent.answerQuestion(question, contextString, conversationHistory);
+    return { answer };
+  } catch (error) {
+    console.error('[DocumentProcessor] Q&A failed:', error);
+    throw error;
+  }
 }

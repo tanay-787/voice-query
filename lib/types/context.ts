@@ -25,6 +25,9 @@ export interface DocumentContext {
   overview: string;
   key_points: string; // JSON stringified array
   definitions: string; // JSON stringified array
+  backend_doc_id?: string;
+  spoken_briefing?: string;
+  page_count?: number;
   created_at: number; // Unix timestamp
   updated_at: number; // Unix timestamp
 }
@@ -39,6 +42,9 @@ export interface DocumentContextInput {
   overview: string;
   key_points: string[];
   definitions: string[];
+  backend_doc_id?: string;
+  spoken_briefing?: string;
+  page_count?: number;
 }
 
 /**
@@ -51,6 +57,9 @@ export interface FormattedContext {
   overview: string;
   keyPoints: string[];
   definitions: string[];
+  backendDocId?: string;
+  spokenBriefing?: string;
+  pageCount?: number;
   createdAt: Date;
   updatedAt: Date;
 }
