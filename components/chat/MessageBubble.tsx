@@ -24,7 +24,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         
         {/* Message Bubble */}
         <Surface
-          variant={isUser ? 'quaternary' : 'default'}
+          variant={isUser ? 'secondary' : 'default'}
           className="rounded-2xl p-3"
         >
           {/* Voice indicator (optional)

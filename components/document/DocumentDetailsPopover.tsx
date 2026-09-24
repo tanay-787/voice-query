@@ -7,7 +7,7 @@
 import type { useDocumentContext } from '@/hooks/useDocumentContext';
 import type { FormattedContext } from '@/types/context';
 import { ThemedIcon } from '@/components/ThemedIcon';
-import { Button, Divider, Popover } from 'heroui-native';
+import { Button, Popover, Separator } from 'heroui-native';
 import React from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { withUniwind } from 'uniwind';
@@ -56,7 +56,7 @@ export function DocumentDetailsPopover({
               </Popover.Title>
             </StyledView>
 
-            <Divider className="my-4" />
+            <Separator className="my-4" />
 
             {/* Document Title */}
             <StyledView className="">
@@ -68,7 +68,7 @@ export function DocumentDetailsPopover({
               </StyledText>
             </StyledView>
 
-            <Divider className="my-4" />
+            <Separator className="my-4" />
 
             {/* Overview */}
             {context.overview && (

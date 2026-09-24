@@ -10,7 +10,6 @@
  */
 
 import { ThemedIcon } from '@/components/ThemedIcon';
-import { useAudioPlayer } from 'expo-audio';
 import { PressableFeedback, useThemeColor } from 'heroui-native';
 import React from 'react';
 import { ScrollView, Text, View } from 'react-native';
@@ -53,8 +52,6 @@ export function VoiceInterface({
   disabled = false,
 }: VoiceInterfaceProps) {
   const [accentColor] = useThemeColor(['accent']);
-  const tapSound = require('../../assets/sfx/mixkit-opening-software-interface.wav');
-  const player = useAudioPlayer(tapSound);
   const { play } = useSoundEffect();
   // State label
   const getStateLabel = () => {

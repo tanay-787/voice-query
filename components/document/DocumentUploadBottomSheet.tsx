@@ -17,8 +17,10 @@ import {
   BottomSheet,
   Button,
   Card,
-  Divider,
-  ErrorView,
+  FieldError,
+  Input,
+  Label,
+  Separator,
   Spinner,
   TextField,
 } from 'heroui-native';
@@ -91,9 +93,9 @@ function URLTextField({ url, onChangeText, isDisabled, hasError, errorMessage }:
 
   return (
     <TextField isInvalid={hasError}>
-      <TextField.Label>Web Page URL</TextField.Label>
+      <Label>Web Page URL</Label>
       <View className="w-full flex-row items-center">
-        <TextField.Input
+        <Input
           ref={inputRef}
           className="flex-1 pl-[62px]"
           value={url}
@@ -110,9 +112,9 @@ function URLTextField({ url, onChangeText, isDisabled, hasError, errorMessage }:
         </StyledText>
       </View>
       {hasError && errorMessage && (
-        <TextField.ErrorMessage>
+        <FieldError>
           {errorMessage}
-        </TextField.ErrorMessage>
+        </FieldError>
       )}
     </TextField>
   );
@@ -207,7 +209,8 @@ export function DocumentUploadBottomSheet({
         showSuccess('Document Processed', 'PDF has been successfully analyzed');
       } else if (hasValidUrl) {
         // Process URL
-        const result = await documentProcessor.processURL(`https://${url}`);
+        const finalUrl = url.startsWith('http://') || url.startsWith('https://') ? url : `https://${url}`;
+        const result = await documentProcessor.processURL(finalUrl);
         await documentContext.save(result.contextInput);
         showSuccess('Document Processed', 'URL content has been successfully analyzed');
       }
@@ -299,9 +302,9 @@ export function DocumentUploadBottomSheet({
                 exiting={FadeOutUp.duration(200)}
                 layout={LinearTransition.springify()}
               >
-                <Divider className="flex-1" />
+                <Separator className="flex-1" />
                 <StyledText className="text-sm text-muted font-medium">OR</StyledText>
-                <Divider className="flex-1" />
+                <Separator className="flex-1" />
               </AnimatedView>
             )}
 
@@ -325,7 +328,7 @@ export function DocumentUploadBottomSheet({
 
             {/* Error Display for PDF */}
             {documentProcessor.error && selectedFile && (
-              <ErrorView isInvalid>{documentProcessor.error.message}</ErrorView>
+              <StyledText className="text-danger text-sm px-1">{documentProcessor.error.message}</StyledText>
             )}
 
             {/* Single CTA Button */}
