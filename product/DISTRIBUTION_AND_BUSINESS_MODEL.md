@@ -1,121 +1,237 @@
-# Distribution Strategy, Business Model & Unit Economics: VoiceQuery
+# Distribution & Business Model
+
+## Status
+
+**Status**: Business model hypothesis.
+
+No pricing, willingness-to-pay, retention, or acquisition assumptions have been validated with users yet.
+
+The purpose of this document is to define assumptions and experiments rather than present forecasts as facts.
 
 ---
 
-## 1. Executive Summary: Does VoiceQuery Have Leverage as a SaaS?
+## 1. Initial distribution hypothesis
 
-**Yes. VoiceQuery possesses extraordinary leverage as a Prosumer SaaS.**
+VoiceQuery is primarily a utility product.
 
-The business model analysis confirms:
-1. **High Willingness to Pay ($14.99/mo to $19.99/mo)**: Target users (investors, executives, consultants, analysts, researchers) value their time at $50–$300+/hour. Saving them 30 minutes a day delivers a >10x immediate ROI.
-2. **Software-Grade Gross Margins (>90%)**: On modern infrastructure (Azure AI Foundry `gpt-4.1-mini` + Azure Neural TTS), processing a 20-page document into a proactive spoken brief and multi-turn voice Q&A costs **~$0.032 per document**. A heavy user consuming 40 documents/month generates **$1.28 in monthly COGS**, yielding an **unprecedented 91.5% gross margin on a $14.99/month plan**.
-3. **Distribution Advantage via Mobile OS Share Sheet**: Unlike desktop AI tools that require context switching, VoiceQuery leverages the native iOS/Android Share Sheet to turn incoming PDF attachments into audio in 2 taps.
-4. **Subscription Superiority Over One-Time Paid App**: Ongoing inference costs (tokens + neural voice synthesis) make a one-time purchase ($9.99) unit-economically fatal for heavy power users. Recurring utility demands recurring SaaS revenue.
+The most likely acquisition moments occur when someone already has a document they need to understand.
 
----
+### Potential entry points:
 
-## 2. Unit Economics & Cost of Goods Sold (COGS)
+#### Share sheet
+A user encounters a PDF or article and sends it directly to VoiceQuery.
 
-### 2.1. Per-Document Cost Breakdown (20-Page Technical PDF)
+#### Direct upload
+A user opens VoiceQuery when they already know they need help understanding a document.
 
-| Component | Service Provider | Volume / Tokens | Unit Price | Cost per Document |
-| :--- | :--- | :--- | :--- | :--- |
-| **Document Ingestion & Indexing** | Azure AI Foundry (`gpt-4.1-mini`) | ~15,000 input tokens | $0.15 / 1M input tokens | **$0.00225** |
-| **Proactive Briefing Generation** | Azure AI Foundry (`gpt-4.1-mini`) | ~150 output tokens | $0.60 / 1M output tokens | **$0.00009** |
-| **Voice Q&A Interrogation (3 Turns)** | Azure AI Foundry (`gpt-4.1-mini`) | ~3,500 input + 400 output tokens | Blended rate | **$0.00076** |
-| **Executive Briefing Audio (TTS)** | Azure Neural Speech / Speechify API | ~650 characters (35s audio) | $16.00 / 1M characters | **$0.01040** |
-| **Spoken Q&A Answers (TTS)** | Azure Neural Speech / Speechify API | ~1,200 characters | $16.00 / 1M characters | **$0.01920** |
-| **Total Variable Cost Per Document** | — | — | — | **$0.03270** (~3.3¢) |
+#### Search / discovery
+Users searching for:
+- PDF summarizer
+- AI PDF reader
+- Talk to PDF
+- Voice PDF assistant
+- Document AI
+- Research assistant
 
-### 2.2. Monthly Per-Subscriber Margins ($14.99 / Month Plan)
+may discover the product.
 
-```mermaid
-pie title Monthly Revenue Breakdown per $14.99 Pro Subscriber
-    "Net Operating Profit ($11.46)": 76.5
-    "App Store Fee 15% ($2.25)": 15.0
-    "AI Inference & TTS COGS ($1.28)": 8.5
-```
+#### Product sharing
+Users could potentially share:
+- Generated briefings
+- Document insights
+- Citations
 
-* **Average Usage Assumption**: 40 documents processed per active month (exceeds typical knowledge worker volume).
-* **Monthly Cloud COGS**: $40 \times \$0.0327 = \mathbf{\$1.28 \text{ / user / month}}$.
-* **Gross Profit**: $\$14.99 - \$1.28 = \mathbf{\$13.71}$ (**91.5% Gross Margin**).
-* **Net Revenue (After 15% Apple/Google Small Business Fee)**: $\$14.99 - \$2.25 - \$1.28 = \mathbf{\$11.46 \text{ net profit / user / month}}$ (**76.5% Net Margin**).
+*However, this should be treated as an experiment rather than assumed to be viral.*
 
 ---
 
-## 3. Market Pricing Benchmarks (2025–2026 Prosumer SaaS)
+## 2. Activation hypothesis
 
-| Product | Positioning | Pricing Model | Benchmark Comparison |
-| :--- | :--- | :--- | :--- |
-| **Speechify** | Reading assistant & TTS | **$139 / year** (~$11.50/mo) or **$29/mo** | Demonstrates that users willingly pay >$100/yr purely to *listen* to text. Generates ~$18M ARR. |
-| **Granola** | AI Meeting Notepad | **$14 / user / month** | Prosumer productivity tool; charges $14/mo for notes from spoken conversations. |
-| **Perplexity Pro** | Search & Source Grounding | **$20 / month** | Proves willingness to pay for fast, cited research synthesis. |
-| **Superhuman** | Email triage | **$30 / month** | Proves executives pay $30/mo for a tool that saves 30 minutes of cognitive drag daily. |
-| **Readwise Reader** | Reading & Highlight Sync | **$9.99 / month** | Bundled reader subscription with high retention among knowledge workers. |
+A useful activation event could be:
 
-**Takeaway**: Pricing VoiceQuery at **$14.99/month ($120/year)** places it right in the sweet spot between reading tools ($9.99/mo) and executive productivity tools ($20–$30/mo).
+> *"User uploads a document and completes the first briefing."*
 
----
+A stronger activation event may be:
 
-## 4. Packaging & Tiering Strategy
+> *"User uploads a document, listens to the briefing, and asks at least one follow-up question."*
 
-According to RevenueCat's **2026 State of Subscription Apps** report, AI apps convert trials to paid subscriptions at **8.5%** (52% higher than non-AI apps). However, loose, unrestricted freemium models convert at only **2.1%**, while gated paywalls convert at **10.7%**.
-
-We therefore adopt a **Usage-Gated "Aha-Moment" Freemium model**:
-
-| Tier | Price | Quotas & Value Gate | Strategic Objective |
-| :--- | :--- | :--- | :--- |
-| **Free / Trial** | **$0** | • **3 documents per month**<br>• Standard on-device TTS audio<br>• 30s executive audio briefings<br>• Basic voice interrogation | **Top-of-Funnel Viral Hook**: Let the user experience their own PDF speaking an executive briefing aloud in < 30 seconds. |
-| **VoiceQuery Pro** *(Primary SaaS)* | **$14.99 / mo**<br>*(or $120 / yr)* | • **Unlimited documents & web articles**<br>• **Ultra-realistic Azure Neural Voices**<br>• Unlimited hands-free voice dialogue<br>• Audio briefing export (sync to podcast app / Apple Watch)<br>• Verified page citation history & notes | **Core Monetization**: Converts active commuters, executives, and researchers into high-retention annual subscribers. |
-| **Teams & Workspaces** | **$35 / seat / mo** | • Shared team document repositories<br>• Private enterprise Azure AI tenant (zero data retention)<br>• SOC2 / HIPAA compliance<br>• Integrations (Notion, Google Drive, OneDrive, Slack) | **Enterprise Expansion**: Institutional sales to investment funds, consulting firms, and legal boutiques. |
+This should be measured experimentally.
 
 ---
 
-## 5. Distribution & Customer Acquisition Channels
+## 3. Retention hypothesis
 
-```mermaid
-flowchart LR
-    A["Native Mobile Share Sheet\n(Slack, WhatsApp, Safari, Mail)"] --> B["Instant Proactive Briefing\n('Aha' Moment in 30s)"]
-    B --> C["Usage Limit (3 Docs Free)"]
-    C --> D["Pro SaaS Conversion\n($14.99/mo or $120/yr)"]
-    B --> E["Viral Audio Share\n('Listen to 30s brief on Web')"]
-    E --> A
-```
+Potential recurring use cases include:
 
-### 5.1. Channel 1: The Native OS Share Sheet (The Invisible Funnel)
-* **Mechanism**: Users don't need to change their workflow. When an email or Slack message arrives with an attached 40-page deck:
-  - User taps: *Share $\rightarrow$ VoiceQuery*.
-  - While they put their phone in their pocket and walk to their car, the audio briefing starts playing through their AirPods.
-* **Friction**: Near zero. No opening websites, no dragging files, no typing prompts.
+- Reviewing research papers
+- Evaluating reports
+- Understanding proposals
+- Preparing for meetings
+- Consuming industry research
+- Reviewing documentation
 
-### 5.2. Channel 2: Viral Audio Briefing Snippets ("Voice Memos for Work")
-* **Mechanism**: After listening to a 35s briefing of an earnings report or project spec, the user can tap: *"Share Audio Briefing to Slack/WhatsApp"*.
-* **Recipient Experience**: Team members receive a high-fidelity 30-second audio note with a lightweight web player: *"Summarized by VoiceQuery — Tap to ask questions aloud"*.
-* **Growth Loop**: Every shared briefing acts as an organic acquisition ad for colleagues.
-
-### 5.3. Channel 3: App Store Optimization (ASO) & Search Intent
-* **High-Intent Keywords**:
-  - *"Chat with PDF voice"*
-  - *"Audio PDF reader"*
-  - *"NotebookLM mobile alternative"*
-  - *"Listen to documents"*
-  - *"AI executive summary voice"*
+*However, "commuting" or "exercise" should not automatically be treated as retention loops. The product needs evidence that users actually return for these situations.*
 
 ---
 
-## 6. Retention & Combating "AI App Churn"
+## 4. Pricing hypothesis
 
-RevenueCat data shows that generic AI wrapper apps suffer from high 12-month churn (retention of ~21%). To ensure long-term LTV and enterprise durability, VoiceQuery incorporates three retention mechanisms:
+An initial pricing hypothesis could be:
 
-1. **Habitual Trigger (Commuting & Exercise Rhythm)**:
-   - VoiceQuery hooks into a daily physical ritual (the morning drive, the train commute, walking between meetings, the gym). Habitual audio consumption has dramatically lower churn than desktop chat utilities.
-2. **Contextual Knowledge Graph**:
-   - As users accumulate documents (e.g. Q1, Q2, Q3 earnings, past contracts), VoiceQuery remembers cross-document context (e.g., *"How does this quarter's operating margin compare to the report I uploaded last month?"*).
-3. **Zero-Touch Audio Queue (Playlist Mode)**:
-   - Users can queue up 3 documents in the morning and have VoiceQuery play back-to-back executive briefings sequentially without ever touching their phone.
+### Free
+- Limited documents
+- Basic briefing
+- Standard voice
+- Limited questions
+
+### Pro
+*Potentially: $14.99 / month*
+
+Possible benefits:
+- Higher document limits
+- Longer conversations
+- Premium voices
+- Saved document history
+- Advanced citations
+- Exports
+
+### Teams
+*Potentially: $35 / seat / month*
+
+Possible benefits:
+- Shared document libraries
+- Team workspaces
+- Administration
+- Enterprise integrations
+- Security / compliance features
+
+*These prices are hypotheses, not market-validated prices.*
 
 ---
 
-## 7. Conclusion
+## 5. Willingness-to-pay experiment
 
-VoiceQuery is not a one-time utility—it is a **daily executive productivity companion**. With **91.5% gross margins**, a **$14.99/month price point**, and the **mobile Share Sheet as a friction-free acquisition engine**, the product has all the necessary leverage to succeed as a high-margin, scalable SaaS.
+Before implementing subscriptions, test whether users value the workflow enough to pay.
+
+**Possible experiment**:
+After users complete several successful document sessions, ask:
+> *"Would you pay for continued access to this?"*
+
+Then test multiple price points with different cohorts.
+
+**Better evidence comes from behavior**:
+- Clicking a pricing option
+- Starting checkout
+- Entering payment details
+- Purchasing
+
+rather than simply asking: *"Would you pay $15?"*
+
+---
+
+## 6. Cost model
+
+The previous cost estimate should be treated as a scenario rather than a guaranteed unit cost.
+
+For each document, calculate:
+
+$$\text{Document processing cost} + \text{LLM generation cost} + \text{Speech generation cost} + \text{Storage} + \text{Bandwidth} + \text{Other infrastructure}$$
+
+The actual cost depends on:
+- Document size
+- Number of pages
+- Number of generated tokens
+- Number of questions
+- Audio duration
+- Model used
+- Caching
+- Storage duration
+
+Therefore:
+> *"Gross margin should be calculated from observed production usage rather than assumed average usage."*
+
+---
+
+## 7. Example unit-economics model
+
+*For planning only:*
+
+| Variable | Example |
+| :--- | :--- |
+| **Monthly price** | $14.99 |
+| **Documents / user / month** | 10 |
+| **Questions / document** | 5 |
+| **Average audio generation** | TBD |
+| **LLM cost** | TBD |
+| **Speech cost** | TBD |
+| **Storage / bandwidth** | TBD |
+| **Total variable cost** | TBD |
+| **Gross margin** | TBD |
+
+*These values should be populated from actual infrastructure measurements.*
+
+---
+
+## 8. Distribution experiments
+
+### Experiment 1 — Share sheet
+**Measure**:
+- Installs from shared documents
+- First-document completion
+- Activation rate
+- Repeat usage
+
+### Experiment 2 — Search acquisition
+Create landing pages targeting specific document workflows.
+
+**Measure**:
+- Impressions
+- Clicks
+- Uploads
+- Activation
+- Repeat usage
+
+### Experiment 3 — Referral
+Allow users to share a generated briefing or result.
+
+**Measure**:
+- Shares / user
+- Recipient visits
+- Recipient uploads
+- Activation
+
+*Do not call this viral growth until the data demonstrates it.*
+
+---
+
+## 9. Business-model decision framework
+
+### Continue monetization experiments if:
+Users demonstrate recurring usage and some users show willingness to pay.
+
+### Change pricing if:
+Users value the product but reject the proposed price.
+
+### Change the target segment if:
+Usage is concentrated strongly in a different user group than initially expected.
+
+### Reconsider the product if:
+Users do not return after the initial novelty of the experience.
+
+---
+
+## 10. Current business conclusion
+
+At the current stage:
+
+- **Problem**: Partially supported by external evidence.
+- **Solution**: Unvalidated hypothesis.
+- **Distribution**: Hypothesis.
+- **Retention**: Hypothesis.
+- **Pricing**: Hypothesis.
+- **Unit economics**: Scenario model.
+
+The next objective is therefore not maximizing revenue.
+
+It is establishing:
+> *"Who repeatedly needs this, what part of the workflow they value, and whether that value is strong enough to support recurring usage and payment."*

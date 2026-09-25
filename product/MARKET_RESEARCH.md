@@ -1,114 +1,147 @@
-# 2026 Market Research & Competitive Landscape: Voice & Document AI
+# Market Research
+
+## Objective
+
+Understand how existing products help users consume complex documents and identify an opportunity worth testing for VoiceQuery.
+
+This research describes observable product capabilities. It does not assume that VoiceQuery is superior to existing products.
 
 ---
 
-## 1. Executive Summary
+## 1. Market categories
 
-In 2026, document processing and conversational AI have bifurcated into two primary paradigms:
-1. **Passive "Chat with PDF" text utilities** (e.g., ChatPDF, AskYourPDF, Acrobat AI Assistant) that rely on typed queries and return dense markdown text blocks.
-2. **Audio-overview / podcast generation tools** (e.g., Google NotebookLM) that produce multi-minute, two-host audio discussions meant for passive listening.
+The current market broadly contains several overlapping approaches.
 
-Neither category addresses the core workflow of the **mobile professional, executive, or researcher on the go**: someone who needs an **instant, proactive 30–45s spoken executive debrief** the moment a document is opened, followed by **fluid, hands-free conversational dialogue backed by exact, real-time visual page citations**.
+### A. Document question-answering
 
-VoiceQuery occupies this unserved white space: **a proactive, mobile-native vocal intelligence companion for complex documents.**
+**Examples**:
+- ChatPDF
+- Adobe Acrobat AI Assistant
+- Similar AI PDF tools
 
----
+**Typical workflow**:
+Upload → ask a question → receive an answer → inspect sources
 
-## 2. Competitive Landscape & Product Analysis
+- **ChatPDF** provides cited sources and multi-file conversations.
+- **Adobe Acrobat AI Assistant** provides document questions, summaries, suggested questions, and source citations.
 
-```mermaid
-quadrantChart
-    title Market Positioning: Audio-First vs. Document-Grounded (2026)
-    x-axis Low Document Grounding --> High Document Grounding (Page Citations)
-    y-axis Passive / Text-First --> Proactive / Vocal-First
-    quadrant-1 VoiceQuery Sweet Spot
-    quadrant-2 General Voice Assistants
-    quadrant-3 Traditional PDF Readers
-    quadrant-4 "Chat with PDF" Text Tools
-    "ChatPDF / AskYourPDF": [0.85, 0.25]
-    "Adobe Acrobat AI": [0.75, 0.35]
-    "Google NotebookLM": [0.65, 0.70]
-    "Speechify Voice AI": [0.35, 0.60]
-    "ChatGPT / Gemini Live Voice": [0.20, 0.85]
-    "VoiceQuery": [0.90, 0.95]
-```
+#### Strength
+Users can directly retrieve information from a document.
+
+#### Potential limitation
+The user generally has to know what they want to ask or explicitly request a summary.
 
 ---
 
-### Detailed Competitor Profiles
+## 2. Audio document understanding
 
-### 2.1. Google NotebookLM
-* **Primary Paradigm**: AI research notebook & podcast generator.
-* **Core Strengths**:
-  - High-quality, natural-sounding two-host "Audio Overview" discussions.
-  - Multi-source document synthesis.
-  - Interactive "voice interrogation" mode allowing follow-up questions to the AI hosts.
-* **Critical Limitations**:
-  - **Overly verbose and slow**: Generates 5–15 minute casual conversations. An executive needing answers in 30 seconds cannot wait through banter.
-  - **Desktop-first**: Mobile experience is secondary and lacks rapid navigation.
-  - **No instant page anchoring**: Citations are global source-level rather than page-by-page visual jump cards.
+### NotebookLM
 
-### 2.2. Speechify Voice AI Assistant
-* **Primary Paradigm**: Text-to-Speech (TTS) reader with added voice typing and basic AI Q&A.
-* **Core Strengths**:
-  - Top-tier synthetic voices and multi-format audio playback.
-  - Broad document format support (PDFs, docs, emails, web pages).
-* **Critical Limitations**:
-  - **Reader-centric, not agentic**: Fundamentally designed to read text verbatim from beginning to end rather than distill insights.
-  - **No proactive executive debriefing**: Does not automatically synthesize and speak key findings on upload.
-  - **Minimal analytical dialogue**: Weak at multi-turn analytical reasoning about dense technical material.
+NotebookLM can generate Audio Overviews from user-provided sources and supports listening on mobile.
 
-### 2.3. Adobe Acrobat AI Assistant
-* **Primary Paradigm**: Traditional enterprise PDF reader with AI command palette.
-* **Core Strengths**:
-  - Native integration with enterprise PDF ecosystems and formatting fidelity.
-  - Basic voice commands for search and summarization.
-* **Critical Limitations**:
-  - **Command utility, not conversational companion**: Voice is treated as speech-to-text dictation into a search bar.
-  - **Text-heavy outputs**: Delivers traditional multi-bullet text boxes that require active reading on mobile screens.
+Google describes Audio Overviews as a way to summarize sources and connect concepts through an audio conversation.
 
-### 2.4. Traditional "Chat with PDF" Apps (ChatPDF, AskYourPDF, ChatDOC)
-* **Primary Paradigm**: Web-based prompt-and-response textboxes.
-* **Core Strengths**:
-  - Direct retrieval-augmented generation (RAG) with page citation markers.
-* **Critical Limitations**:
-  - **100% Passive**: Sits completely blank waiting for the user to type prompts.
-  - **Zero Voice Integration**: No spoken-cadence response generation or native audio workflows.
-  - **High cognitive load**: Forces users to type complex prompts on mobile keyboards.
+#### Strength
+Audio provides an alternative to reading and can support on-the-go consumption.
 
-### 2.5. Generalist Voice Assistants (ChatGPT Advanced Voice, Gemini Live)
-* **Primary Paradigm**: General conversational voice assistant with image/file attachment.
-* **Core Strengths**:
-  - Ultra-low latency voice-to-voice interaction with interruptibility.
-* **Critical Limitations**:
-  - **Generalist, not document-grounded**: Cannot display structured page citations, excerpt inspections, or persistent document libraries.
-  - **Hallucination risk**: Lacks verifiable visual anchor cards during audio conversation.
+#### Potential opportunity
+VoiceQuery can investigate whether users want a different interaction:
+
+> *"Short orientation → conversational follow-up"*
+
+rather than treating the audio overview itself as the final product.
+
+This is an assumption to test, not an established market gap.
 
 ---
 
-## 3. Competitive Comparison Matrix
+## 3. General-purpose AI assistants
 
-| Feature / Capability | Google NotebookLM | Speechify Voice | Adobe Acrobat AI | ChatPDF / ChatDOC | **VoiceQuery** |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **Proactive Audio Briefing** | ❌ (10m Podcast) | ❌ | ❌ | ❌ | **✅ (30–45s Executive Brief)** |
-| **Conversational Voice Dialogue** | ⚠️ (Banter-style) | ⚠️ (Basic Q&A) | ❌ (Commands only) | ❌ | **✅ (Natural Spoken Cadence)** |
-| **Real-Time Visual Page Citations** | ⚠️ (Source-level) | ❌ | ⚠️ (Text highlights) | ✅ (Text only) | **✅ (Page Badge + Excerpt Card)** |
-| **Mobile-Native Vocal UI (Orb)** | ❌ (Web/List) | ❌ (Player bar) | ❌ (PDF viewer) | ❌ (Chatbox) | **✅ (Fluid Vocal Orb UI)** |
-| **Suggested Exploration Chips** | ⚠️ (Static prompts) | ❌ | ⚠️ (Static pills) | ⚠️ (Basic prompts) | **✅ (Contextual Spoken Chips)** |
-| **Hands-Free Commuting Experience** | ⚠️ (Passive listen) | ⚠️ (Passive read) | ❌ | ❌ | **✅ (Fully Hands-Free)** |
+Examples include general AI assistants with:
+- Voice interaction
+- Document uploads
+- Contextual conversations
+- Multimodal capabilities
+
+#### Strength
+Broad capability and familiar conversational interfaces.
+
+#### Potential opportunity
+VoiceQuery can focus specifically on the document-understanding workflow rather than general-purpose assistance.
+
+Again, this must be validated through user behavior.
 
 ---
 
-## 4. VoiceQuery’s Strategic Moat & Differentiation
+## 4. Competitive capability matrix
 
-### 1. The Proactive 30–45s Executive Briefing
-Instead of forcing users to think of what to ask, VoiceQuery takes the initiative. Within seconds of ingestion, it speaks the bottom-line truth: headline conclusion, key metrics, and points of tension.
+| Capability | ChatPDF | Acrobat AI | NotebookLM | VoiceQuery hypothesis |
+| :--- | :--- | :--- | :--- | :--- |
+| **Document Q&A** | Yes | Yes | Yes | Yes |
+| **Source citations** | Yes | Yes | Yes | Yes |
+| **Summaries** | Yes | Yes | Yes | Yes |
+| **Audio generation** | No / limited | Yes | Yes | Yes |
+| **Mobile usage** | Yes | Yes | Yes | Yes |
+| **Voice interaction** | Limited | Varies | Yes | Core interaction |
+| **Proactive briefing** | Summary-oriented | Summary-oriented | Audio Overview | Core hypothesis |
+| **Short briefing constraint** | Not core | Not core | Not core | 30–45 sec hypothesis |
+| **Page-level verification** | Yes | Yes | Source-grounded | Core interaction |
 
-### 2. Speech-First Cadence (Crafted for the Ear)
-Reading AI-generated text aloud with conventional TTS often fails because models output markdown tables, asterisks, bulleted hierarchies, and parenthetical citations. VoiceQuery shapes text specifically for human auditory rhythm—fluid, conversational, and direct.
+*Capabilities change over time, so this table should be periodically rechecked against current product documentation. Adobe, for example, now explicitly supports audio overviews alongside summaries and cited answers.*
 
-### 3. Verifiable Trust via Visual Page Citations
-Auditory consumption requires trust. By displaying real-time visual page badges (`[Referenced: Page X]`) with one-tap access to the quoted excerpt, users never doubt where an answer originated.
+---
 
-### 4. Zero-Friction Mobile Interaction
-Designed around an organic, animated **Vocal Orb** and contextually generated **Suggested Query Chips**, enabling high-speed document interrogation with minimal physical touch or typing.
+## 5. Potential differentiation
+
+VoiceQuery should not claim:
+> *"Nobody does this."*
+
+Instead, the product hypothesis is:
+> *"Existing products validate multiple parts of the workflow, while VoiceQuery is testing whether combining proactive short-form orientation with voice-first follow-up creates a meaningfully better experience for a specific group of document consumers."*
+
+### Potential differentiators to test:
+
+1. **Proactive orientation**: The user receives an initial explanation without having to formulate a question.
+2. **Voice-first continuation**: The user can continue the investigation naturally through speech.
+3. **Verification**: Important claims can be traced back to the document.
+4. **Mobile-first workflow**: The interaction is designed around situations where reading a long document is inconvenient.
+
+*None of these should be considered defensible differentiators until users demonstrate that they matter.*
+
+---
+
+## 6. Competitive research questions
+
+The next research cycle should answer:
+
+1. Which existing product do target users currently use?
+2. What do they like about it?
+3. What causes them to switch between reading, searching, summarizing, and asking AI?
+4. Do they already use audio summaries?
+5. When do they prefer audio vs text?
+6. Do citations change their trust in AI-generated answers?
+7. Is proactive information useful or annoying?
+8. What document types create the strongest recurring need?
+
+---
+
+## 7. Strategic conclusion
+
+The market is not empty.
+
+Users can already:
+- Chat with documents
+- Generate summaries
+- Receive citations
+- Generate audio overviews
+- Use document AI on mobile
+
+Therefore, VoiceQuery should not be positioned simply as:
+> *"AI that lets you talk to PDFs."*
+
+That category already exists.
+
+The stronger product question is:
+> *"Can a proactive, short, voice-first document orientation followed by conversational investigation create enough additional value that users prefer it for specific document-consumption situations?"*
+
+That is the hypothesis VoiceQuery should validate.
