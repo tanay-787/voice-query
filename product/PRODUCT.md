@@ -1,5 +1,21 @@
 # VoiceQuery
 
+## What VoiceQuery is
+
+VoiceQuery is a voice-first document companion for mobile. Instead of making you read through pages of dense PDFs or stare at an empty chatbot box, it interacts with you primarily through speech.
+
+### Main value proposition
+
+> "Give it a dense document, immediately hear what matters most in a 30-second spoken briefing, and continue the investigation naturally by voice—backed by verifiable page references."
+
+### The 3 things it changes for the user
+
+1. **You don't start by reading or prompting**: The app speaks first with a concise executive debrief.
+2. **You don't type to explore**: You ask follow-up questions out loud like talking to an analyst.
+3. **You don't have to blindly trust it**: Every key claim tells you exactly which page it came from so you can verify it in one tap.
+
+---
+
 ## Product hypothesis
 
 VoiceQuery explores whether people who regularly consume dense documents can understand and act on them more efficiently through a voice-first document companion.

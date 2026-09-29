@@ -1,9 +1,9 @@
 packages:
-  - '.'
-  - 'backend'
-
-allowBuilds:
-  '@google/genai': true
-  '@sentry/cli': false
-  protobufjs: true
-  unrs-resolver: true
+  - 'client'
+  - 'server'
+minimumReleaseAgeExclude:
+  - '@expo/ui@57.0.21'
+  - expo-constants@57.0.20
+  - expo-modules-core@57.0.20
+  - expo-router@57.0.24
+  - expo@57.0.26
