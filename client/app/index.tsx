@@ -1,6 +1,8 @@
 import React, { useState } from "react";
-import { ScrollView, StatusBar, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
+import { NavigationBar } from "expo-navigation-bar";
 import { Feather } from "@expo/vector-icons";
 
 import { Alert } from "@/components/primitives/alert";
@@ -29,12 +31,29 @@ export default function Index() {
   const [switchVal, setSwitchVal] = useState(true);
   const [toggleVal, setToggleVal] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [isImmersive, setIsImmersive] = useState(false);
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0B0D13" />
+      <StatusBar style="light" hidden={isImmersive} animated={true} />
+      <NavigationBar style="dark" hidden={isImmersive} />
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.heading}>Reacticx Components</Text>
+
+        {/* System Bars Control */}
+        <Text style={styles.label}>0. System Bars (Translucent & Immersive)</Text>
+        <View style={styles.row}>
+          <RippleButton.Root
+            variant="outline"
+            theme="dark"
+            size="sm"
+            onPress={() => setIsImmersive(!isImmersive)}
+          >
+            <RippleButton.Label>
+              {isImmersive ? "Exit Immersive (Show Bars)" : "Enter Immersive (Hide Both Bars)"}
+            </RippleButton.Label>
+          </RippleButton.Root>
+        </View>
 
         {/* 1. Ripple Button */}
         <Text style={styles.label}>1. RippleButton</Text>

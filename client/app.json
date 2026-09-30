@@ -93,8 +93,19 @@
       ],
       "expo-sharing",
       "expo-secure-store",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-navigation-bar",
+        {
+          "enforceContrast": false
+        }
+      ]
     ],
+    "androidStatusBar": {
+      "barStyle": "light-content",
+      "translucent": true,
+      "backgroundColor": "#00000000"
+    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
