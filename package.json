@@ -12,7 +12,8 @@
     "client:lint": "pnpm --filter @voice-query/client lint",
     "server:dev": "pnpm --filter @voice-query/server dev",
     "server:start": "pnpm --filter @voice-query/server start",
-    "prepare": "husky"
+    "prepare": "husky",
+    "prepare:termux": "husky && (command -v termux-fix-shebang >/dev/null 2>&1 && termux-fix-shebang .husky/* .husky/_/* 2>/dev/null || true)"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.0",
