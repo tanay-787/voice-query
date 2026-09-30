@@ -11,7 +11,18 @@
       "icon": "./assets/expo.icon",
       "supportsTablet": true,
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Allow VoiceQuery to access your microphone for voice questions about your documents."
+        "NSMicrophoneUsageDescription": "Allow VoiceQuery to access your microphone for voice questions about your documents.",
+        "CFBundleDocumentTypes": [
+          {
+            "CFBundleTypeName": "PDF Document",
+            "CFBundleTypeRole": "Viewer",
+            "LSHandlerRank": "Alternate",
+            "LSItemContentTypes": [
+              "com.adobe.pdf"
+            ]
+          }
+        ],
+        "LSSupportsOpeningDocumentsInPlace": true
       }
     },
     "android": {
@@ -25,7 +36,28 @@
         "RECORD_AUDIO",
         "MODIFY_AUDIO_SETTINGS"
       ],
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "SEND",
+          "category": [
+            "DEFAULT"
+          ],
+          "data": {
+            "mimeType": "application/pdf"
+          }
+        },
+        {
+          "action": "VIEW",
+          "category": [
+            "DEFAULT",
+            "BROWSABLE"
+          ],
+          "data": {
+            "mimeType": "application/pdf"
+          }
+        }
+      ]
     },
     "web": {
       "output": "static",
