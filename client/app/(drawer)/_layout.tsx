@@ -1,0 +1,20 @@
+import { Drawer } from "expo-router/drawer";
+
+export default function DrawerLayout() {
+  return (
+    <Drawer
+      screenOptions={{
+        headerShown: false,
+        swipeEnabled: false,
+      }}
+    >
+      <Drawer.Screen
+        name="index"
+        options={{
+          drawerLabel: "Canvas",
+          title: "Canvas",
+        }}
+      />
+    </Drawer>
+  );
+}
