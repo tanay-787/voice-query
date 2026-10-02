@@ -79,8 +79,16 @@ const Headline: React.FC<{ tokens: IWelcomeToken[]; colors: WelcomeColors }> =
             {token.source ? (
               <Image
                 source={{ uri: token.source }}
-                style={styles.avatarImage}
-                resizeMode="cover"
+                style={[
+                  styles.avatarImage,
+                  token.imageScale
+                    ? {
+                        width: `${token.imageScale * 100}%`,
+                        height: `${token.imageScale * 100}%`,
+                      }
+                    : null,
+                ]}
+                resizeMode="contain"
               />
             ) : (
               <Text style={styles.avatarEmoji}>{token.emoji}</Text>

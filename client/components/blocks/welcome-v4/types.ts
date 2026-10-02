@@ -21,7 +21,13 @@ export interface IWelcomeActionRow {
 
 export type IWelcomeToken =
   | { kind: "word"; text: string; muted?: boolean }
-  | { kind: "avatar"; background: string; emoji?: string; source?: string };
+  | {
+      kind: "avatar";
+      background: string;
+      emoji?: string;
+      source?: string;
+      imageScale?: number;
+    };
 
 export interface IWelcomeLegalLink {
   key: string;

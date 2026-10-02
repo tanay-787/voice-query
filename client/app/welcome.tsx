@@ -27,7 +27,7 @@ export default function WelcomeRoute() {
           {
             kind: "avatar",
             background: theme.accentMint,
-            source: "https://api.dicebear.com/9.x/bottts/png?seed=Coco",
+            source: "https://api.dicebear.com/9.x/bottts/png?seed=Coco&scale=85",
           },
         ]}
         actions={[
