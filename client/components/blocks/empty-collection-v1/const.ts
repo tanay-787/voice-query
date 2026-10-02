@@ -5,9 +5,9 @@ export const DEFAULT_TITLE =
 
 export const DEFAULT_ACTION_LABEL = "Find your perfect choice";
 export const DEFAULT_PHOTOS = [
-  "https://i.pinimg.com/1200x/fd/ae/7d/fdae7df0550dc57de8a9b5ad440a97dc.jpg",
-  "https://i.pinimg.com/1200x/16/ed/ca/16edca64fceda23950caf8a5a3bdcb5b.jpg",
-  "https://i.pinimg.com/736x/cd/63/c7/cd63c743a3ed6a81b887fd19367ec26f.jpg",
+  "https://i.pinimg.com/736x/3c/bc/25/3cbc25ddad166dafa64667e570236bc9.jpg",
+  "https://i.pinimg.com/736x/c1/2a/02/c12a02e6e7b5f4c719412afc8fa6793d.jpg",
+  "https://i.pinimg.com/736x/c0/ef/6b/c0ef6b961889fb9f19c36f8c5a021cb6.jpg",
 ] as const;
 
 export const CONTENT_HORIZONTAL_PADDING = 24;
