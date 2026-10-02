@@ -2,20 +2,22 @@ import React from "react";
 import { StatusBar } from "expo-status-bar";
 import { WelcomeScreenV4 } from "@/components/blocks/welcome-v4";
 import { useOnboarding } from "@/context/onboarding-context";
+import { useTheme } from "@/context/theme-context";
 
 export default function WelcomeRoute() {
   const { completeOnboarding } = useOnboarding();
+  const { theme, isDark } = useTheme();
 
   return (
     <>
-      <StatusBar style="dark" />
+      <StatusBar style={isDark ? "light" : "dark"} />
       <WelcomeScreenV4
         wordmark="voicequery"
         headline={[
           { kind: "word", text: "Your", muted: true },
           {
             kind: "avatar",
-            background: "#dcd8f7",
+            background: theme.accentLavender,
             source: "https://api.dicebear.com/9.x/lorelei/png?seed=Milo",
           },
           { kind: "word", text: "documents" },
@@ -24,7 +26,7 @@ export default function WelcomeRoute() {
           { kind: "word", text: "back." },
           {
             kind: "avatar",
-            background: "#cfe6d2",
+            background: theme.accentMint,
             source: "https://api.dicebear.com/9.x/bottts/png?seed=Coco",
           },
         ]}

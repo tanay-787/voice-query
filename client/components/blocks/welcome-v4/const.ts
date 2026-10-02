@@ -63,17 +63,37 @@ export const ACTION_RADIUS = 14;
 export const ACTION_GAP = 15;
 export const WORDMARK_SIZE = 28;
 
-export const COLORS = {
-  screen: "#ffffff",
-  wordmark: "#111111",
-  headline: "#111111",
-  headlineMuted: "#a8a8a8",
-  primary: "#2b2b2b",
-  primaryPressed: "#454545",
-  primaryLabel: "#ffffff",
-  secondary: "#f0f0f0",
-  secondaryPressed: "#e4e4e4",
-  secondaryLabel: "#111111",
-  legal: "#9a9a9a",
-  legalLink: "#818181",
+import { theme } from "@/theme";
+
+export const WELCOME_THEME = {
+  light: {
+    screen: theme.light.background,
+    wordmark: theme.light.textPrimary,
+    headline: theme.light.textPrimary,
+    headlineMuted: theme.light.textSecondary,
+    primary: theme.light.actionPrimary,
+    primaryPressed: theme.light.actionPrimaryPressed,
+    primaryLabel: theme.light.actionPrimaryLabel,
+    secondary: theme.light.actionSecondary,
+    secondaryPressed: theme.light.actionSecondaryPressed,
+    secondaryLabel: theme.light.actionSecondaryLabel,
+    legal: theme.light.textTertiary,
+    legalLink: theme.light.textSecondary,
+  },
+  dark: {
+    screen: theme.dark.background,
+    wordmark: theme.dark.textPrimary,
+    headline: theme.dark.textPrimary,
+    headlineMuted: theme.dark.textSecondary,
+    primary: theme.dark.actionPrimary,
+    primaryPressed: theme.dark.actionPrimaryPressed,
+    primaryLabel: theme.dark.actionPrimaryLabel,
+    secondary: theme.dark.actionSecondary,
+    secondaryPressed: theme.dark.actionSecondaryPressed,
+    secondaryLabel: theme.dark.actionSecondaryLabel,
+    legal: theme.dark.textTertiary,
+    legalLink: theme.dark.textSecondary,
+  },
 } as const;
+
+export const COLORS = WELCOME_THEME.light;

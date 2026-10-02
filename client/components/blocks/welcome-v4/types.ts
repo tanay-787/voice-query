@@ -37,6 +37,7 @@ export interface IWelcomeScreenV4 {
   legalLinks?: IWelcomeLegalLink[];
   legalSuffix?: string;
   logo?: React.ReactNode;
+  theme?: "light" | "dark";
   style?: StyleProp<ViewStyle>;
   onActionPress?: (action: IWelcomeAction) => void;
 }

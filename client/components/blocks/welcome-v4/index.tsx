@@ -9,6 +9,8 @@ import React, { memo, useCallback, useState } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
+import { RippleButton } from "@/components/primitives/ripple-button";
+import { useTheme } from "@/context/theme-context";
 import {
   ACTION_GAP,
   ACTION_HEIGHT,
@@ -26,6 +28,7 @@ import {
   HEADLINE_LINE_HEIGHT,
   HEADLINE_SIZE,
   ICON_SIZE,
+  WELCOME_THEME,
   WORDMARK_SIZE,
 } from "./const";
 import type {
@@ -36,9 +39,11 @@ import type {
   IWelcomeToken,
 } from "./types";
 
+type WelcomeColors = (typeof WELCOME_THEME)[keyof typeof WELCOME_THEME];
+
 const AppleGlyph: React.FC<IGlyph> = ({
   size = ICON_SIZE,
-  color = COLORS.primaryLabel,
+  color = "#ffffff",
 }: IGlyph) => (
   <Svg width={size * 1.9} height={size * 1.922} viewBox="0 0 24 24" fill="none">
     <Path
@@ -52,77 +57,79 @@ const ICONS: Record<NonNullable<IWelcomeAction["icon"]>, React.FC<IGlyph>> = {
   apple: AppleGlyph,
 };
 
-const Headline: React.FC<{ tokens: IWelcomeToken[] }> = memo(({ tokens }) => (
-  <View style={styles.headline}>
-    {tokens.map((token, index) =>
-      token.kind === "word" ? (
-        <Text
-          key={`${token.text}-${index}`}
-          style={[styles.word, token.muted ? styles.wordMuted : null]}
-        >
-          {token.text}
-        </Text>
-      ) : (
-        <View
-          key={`avatar-${index}`}
-          style={[styles.avatar, { backgroundColor: token.background }]}
-        >
-          {token.source ? (
-            <Image
-              source={{ uri: token.source }}
-              style={styles.avatarImage}
-              resizeMode="cover"
-            />
-          ) : (
-            <Text style={styles.avatarEmoji}>{token.emoji}</Text>
-          )}
-        </View>
-      ),
-    )}
-  </View>
-));
+const Headline: React.FC<{ tokens: IWelcomeToken[]; colors: WelcomeColors }> =
+  memo(({ tokens, colors }) => (
+    <View style={styles.headline}>
+      {tokens.map((token, index) =>
+        token.kind === "word" ? (
+          <Text
+            key={`${token.text}-${index}`}
+            style={[
+              styles.word,
+              { color: token.muted ? colors.headlineMuted : colors.headline },
+            ]}
+          >
+            {token.text}
+          </Text>
+        ) : (
+          <View
+            key={`avatar-${index}`}
+            style={[styles.avatar, { backgroundColor: token.background }]}
+          >
+            {token.source ? (
+              <Image
+                source={{ uri: token.source }}
+                style={styles.avatarImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <Text style={styles.avatarEmoji}>{token.emoji}</Text>
+            )}
+          </View>
+        ),
+      )}
+    </View>
+  ));
 
-const ActionRow: React.FC<IWelcomeActionRow> = memo(
-  ({ action, onPress }: IWelcomeActionRow) => {
-    const [pressed, setPressed] = useState<boolean>(false);
-    const primary = action.variant !== "secondary";
-    const Icon = action.icon ? ICONS[action.icon] : null;
+const ActionRow: React.FC<
+  IWelcomeActionRow & { activeMode: "light" | "dark" }
+> = memo(({ action, activeMode, onPress }) => {
+  const primary = action.variant !== "secondary";
+  const buttonVariant = primary ? "default" : "secondary";
+  const Icon = action.icon ? ICONS[action.icon] : null;
 
-    const handlePress = useCallback(() => onPress?.(action), [action, onPress]);
-    const handlePressIn = useCallback(() => setPressed(true), []);
-    const handlePressOut = useCallback(() => setPressed(false), []);
+  const handlePress = useCallback(() => onPress?.(action), [action, onPress]);
 
-    return (
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={action.label}
-        onPress={handlePress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        style={[
-          styles.action,
-          primary ? styles.actionPrimary : styles.actionSecondary,
-          pressed
-            ? primary
-              ? styles.actionPrimaryPressed
-              : styles.actionSecondaryPressed
-            : null,
-        ]}
-      >
-        {Icon ? <Icon size={ICON_SIZE} /> : null}
-        <Text
-          style={[
-            styles.actionLabel,
-            primary ? styles.actionLabelPrimary : styles.actionLabelSecondary,
-          ]}
-          numberOfLines={1}
-        >
+  const iconColor =
+    activeMode === "dark"
+      ? primary
+        ? "#111111"
+        : "#F6F3EC"
+      : primary
+        ? "#FFFFFF"
+        : "#111111";
+
+  return (
+    <RippleButton
+      variant={buttonVariant}
+      theme={activeMode}
+      accessibilityLabel={action.label}
+      onPress={handlePress}
+      style={styles.action}
+    >
+      <RippleButton.Content>
+        {Icon ? (
+          <RippleButton.Icon>
+            <Icon size={ICON_SIZE} color={iconColor} />
+          </RippleButton.Icon>
+        ) : null}
+        <RippleButton.Label style={styles.actionLabel}>
           {action.label}
-        </Text>
-      </Pressable>
-    );
-  },
-);
+        </RippleButton.Label>
+      </RippleButton.Content>
+    </RippleButton>
+  );
+});
 
 const WelcomeScreenV4: React.FC<IWelcomeScreenV4> = ({
   wordmark = DEFAULT_WORDMARK,
@@ -133,9 +140,14 @@ const WelcomeScreenV4: React.FC<IWelcomeScreenV4> = ({
   legalSuffix = DEFAULT_LEGAL_SUFFIX,
   logo,
   style,
+  theme: themeProp,
   onActionPress,
 }: IWelcomeScreenV4) => {
   const insets = useSafeAreaInsets();
+  const { mode: systemMode } = useTheme();
+  const activeMode = themeProp ?? systemMode;
+  const colors = WELCOME_THEME[activeMode];
+
   const [loaded] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -144,17 +156,21 @@ const WelcomeScreenV4: React.FC<IWelcomeScreenV4> = ({
   });
 
   if (!loaded) {
-    return <View style={[styles.container, style]} />;
+    return <View style={[styles.container, { backgroundColor: colors.screen }, style]} />;
   }
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, { backgroundColor: colors.screen }, style]}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        {logo ?? <Text style={styles.wordmark}>{wordmark}</Text>}
+        {logo ?? (
+          <Text style={[styles.wordmark, { color: colors.wordmark }]}>
+            {wordmark}
+          </Text>
+        )}
       </View>
 
       <View style={[styles.content, { paddingBottom: insets.bottom + 20 }]}>
-        <Headline tokens={headline} />
+        <Headline tokens={headline} colors={colors} />
 
         <View
           style={[
@@ -168,19 +184,20 @@ const WelcomeScreenV4: React.FC<IWelcomeScreenV4> = ({
             <ActionRow
               key={action.key}
               action={action}
+              activeMode={activeMode}
               onPress={onActionPress}
             />
           ))}
         </View>
 
-        <Text style={styles.legal}>
+        <Text style={[styles.legal, { color: colors.legal }]}>
           {legalPrefix}{" "}
           {legalLinks.map((link, index) => (
             <Text key={link.key}>
               <Text
                 accessibilityRole="link"
                 onPress={link.onPress}
-                style={styles.legalLink}
+                style={[styles.legalLink, { color: colors.legalLink }]}
               >
                 {link.label}
               </Text>
@@ -254,36 +271,14 @@ const styles = StyleSheet.create({
     gap: ACTION_GAP,
   },
   action: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
     height: ACTION_HEIGHT,
     paddingHorizontal: 18,
     borderRadius: ACTION_RADIUS,
-  },
-  actionPrimary: {
-    backgroundColor: COLORS.primary,
-  },
-  actionPrimaryPressed: {
-    backgroundColor: COLORS.primaryPressed,
-  },
-  actionSecondary: {
-    backgroundColor: COLORS.secondary,
-  },
-  actionSecondaryPressed: {
-    backgroundColor: COLORS.secondaryPressed,
   },
   actionLabel: {
     fontFamily: FONTS.semiBold,
     fontSize: 15.5,
     letterSpacing: -0.2,
-  },
-  actionLabelPrimary: {
-    color: COLORS.primaryLabel,
-  },
-  actionLabelSecondary: {
-    color: COLORS.secondaryLabel,
   },
   legal: {
     fontFamily: FONTS.regular,
