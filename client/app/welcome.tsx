@@ -12,22 +12,20 @@ export default function WelcomeRoute() {
       <WelcomeScreenV4
         wordmark="voicequery"
         headline={[
-          { kind: "word", text: "documents" },
+          { kind: "word", text: "Your", muted: true },
           {
             kind: "avatar",
             background: "#dcd8f7",
-            emoji: "🎙️",
+            source: "https://api.dicebear.com/9.x/lorelei/png?seed=Milo",
           },
-          { kind: "word", text: "that" },
-          { kind: "word", text: "you", muted: true },
+          { kind: "word", text: "documents" },
           { kind: "word", text: "can", muted: true },
-          { kind: "word", text: "hear" },
-          { kind: "word", text: "and" },
-          { kind: "word", text: "ask" },
+          { kind: "word", text: "talk" },
+          { kind: "word", text: "back." },
           {
             kind: "avatar",
             background: "#cfe6d2",
-            emoji: "📄",
+            source: "https://api.dicebear.com/9.x/bottts/png?seed=Coco",
           },
         ]}
         actions={[
