@@ -19,6 +19,8 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import Svg, { Path } from "react-native-svg";
+import { RippleButton } from "@/components/primitives/ripple-button";
+import { useTheme } from "@/context/theme-context";
 import type { IEmptyCollectionState, IGlyph, IPhotoCard } from "./types";
 import {
   ACTION_HEIGHT,
@@ -28,11 +30,12 @@ import {
   CARD_LAYOUTS,
   CARD_RADIUS,
   CARD_WIDTH,
-  COLORS,
   CONTENT_HORIZONTAL_PADDING,
+  COLORS,
   DEFAULT_ACTION_LABEL,
   DEFAULT_PHOTOS,
   DEFAULT_TITLE,
+  EMPTY_COLLECTION_THEME,
   ENTRANCE_SPRING,
   ENTRANCE_STAGGER,
   ENTRANCE_START_SCALE,
@@ -43,9 +46,12 @@ import {
   STACK_WIDTH,
 } from "./const";
 
+type EmptyCollectionColors =
+  (typeof EMPTY_COLLECTION_THEME)[keyof typeof EMPTY_COLLECTION_THEME];
+
 const ArrowRightGlyph: React.FC<IGlyph> = ({
   size = 15,
-  color = COLORS.actionLabel,
+  color = "#ffffff",
 }: IGlyph) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Path
@@ -58,75 +64,86 @@ const ArrowRightGlyph: React.FC<IGlyph> = ({
   </Svg>
 );
 
-const PhotoCard: React.FC<IPhotoCard> = memo(
-  ({ source, layout, index, animated }: IPhotoCard) => {
-    const progress = useSharedValue<number>(animated ? 0 : 1);
-    const drift = useSharedValue<number>(0);
+const PhotoCard: React.FC<
+  IPhotoCard & { colors: EmptyCollectionColors }
+> = memo(({ source, layout, index, animated, colors }) => {
+  const progress = useSharedValue<number>(animated ? 0 : 1);
+  const drift = useSharedValue<number>(0);
 
-    useEffect(() => {
-      if (!animated) {
-        cancelAnimation(progress);
-        cancelAnimation(drift);
-        progress.value = 1;
-        drift.value = 0;
-        return;
-      }
+  useEffect(() => {
+    if (!animated) {
+      cancelAnimation(progress);
+      cancelAnimation(drift);
+      progress.value = 1;
+      drift.value = 0;
+      return;
+    }
 
-      progress.value = withDelay(
-        index * ENTRANCE_STAGGER,
-        withSpring(1, ENTRANCE_SPRING),
-      );
-
-      drift.value = withDelay(
-        index * FLOAT_STAGGER,
-        withRepeat(
-          withTiming(1, {
-            duration: FLOAT_DURATION,
-            easing: Easing.inOut(Easing.sin),
-          }),
-          -1,
-          true,
-        ),
-      );
-
-      return () => {
-        cancelAnimation(progress);
-        cancelAnimation(drift);
-      };
-    }, [animated, drift, index, progress]);
-
-    const cardStyle = useAnimatedStyle(() => ({
-      opacity: progress.value,
-      transform: [
-        { translateX: progress.value * layout.translateX },
-        {
-          translateY:
-            progress.value * layout.translateY +
-            interpolate(drift.value, [0, 1], [0, -FLOAT_DISTANCE]),
-        },
-        { rotate: `${progress.value * layout.rotate}deg` },
-        {
-          scale: interpolate(progress.value, [0, 1], [ENTRANCE_START_SCALE, 1]),
-        },
-      ],
-    }));
-
-    return (
-      <Animated.View style={[styles.card, cardStyle]}>
-        {source ? (
-          <Image
-            source={source}
-            style={styles.photo}
-            resizeMode="cover"
-            accessibilityIgnoresInvertColors
-          />
-        ) : (
-          <View style={[styles.photo, styles.placeholder]} />
-        )}
-      </Animated.View>
+    progress.value = withDelay(
+      index * ENTRANCE_STAGGER,
+      withSpring(1, ENTRANCE_SPRING),
     );
-  },
-);
+
+    drift.value = withDelay(
+      index * FLOAT_STAGGER,
+      withRepeat(
+        withTiming(1, {
+          duration: FLOAT_DURATION,
+          easing: Easing.inOut(Easing.sin),
+        }),
+        -1,
+        true,
+      ),
+    );
+
+    return () => {
+      cancelAnimation(progress);
+      cancelAnimation(drift);
+    };
+  }, [animated, drift, index, progress]);
+
+  const cardStyle = useAnimatedStyle(() => ({
+    opacity: progress.value,
+    transform: [
+      { translateX: progress.value * layout.translateX },
+      {
+        translateY:
+          progress.value * layout.translateY +
+          interpolate(drift.value, [0, 1], [0, -FLOAT_DISTANCE]),
+      },
+      { rotate: `${progress.value * layout.rotate}deg` },
+      {
+        scale: interpolate(progress.value, [0, 1], [ENTRANCE_START_SCALE, 1]),
+      },
+    ],
+  }));
+
+  return (
+    <Animated.View
+      style={[
+        styles.card,
+        {
+          borderColor: colors.card,
+          backgroundColor: colors.card,
+        },
+        cardStyle,
+      ]}
+    >
+      {source ? (
+        <Image
+          source={source}
+          style={styles.photo}
+          resizeMode="cover"
+          accessibilityIgnoresInvertColors
+        />
+      ) : (
+        <View
+          style={[styles.photo, { backgroundColor: colors.placeholder }]}
+        />
+      )}
+    </Animated.View>
+  );
+});
 PhotoCard.displayName = "PhotoCard";
 
 const EmptyCollectionState: React.FC<IEmptyCollectionState> = ({
@@ -135,13 +152,13 @@ const EmptyCollectionState: React.FC<IEmptyCollectionState> = ({
   photos,
   hideAction = false,
   animated = true,
+  theme: themeProp,
   style,
   onActionPress,
 }: IEmptyCollectionState) => {
-  const [isActionPressed, setIsActionPressed] = useState<boolean>(false);
-
-  const handlePressIn = useCallback((): void => setIsActionPressed(true), []);
-  const handlePressOut = useCallback((): void => setIsActionPressed(false), []);
+  const { mode: systemMode } = useTheme();
+  const activeMode = themeProp ?? systemMode;
+  const colors = EMPTY_COLLECTION_THEME[activeMode];
 
   const cards = useMemo<(ImageSourcePropType | null)[]>(() => {
     const sources: ImageSourcePropType[] =
@@ -150,7 +167,7 @@ const EmptyCollectionState: React.FC<IEmptyCollectionState> = ({
   }, [photos]);
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, { backgroundColor: colors.screen }, style]}>
       <View style={styles.stack}>
         {CARD_LAYOUTS.map((layout, index) => (
           <PhotoCard
@@ -159,26 +176,26 @@ const EmptyCollectionState: React.FC<IEmptyCollectionState> = ({
             layout={layout}
             index={index}
             animated={animated}
+            colors={colors}
           />
         ))}
       </View>
 
-      <Text style={styles.title}>{title}</Text>
+      <Text style={[styles.title, { color: colors.title }]}>{title}</Text>
 
       {hideAction ? null : (
-        <Pressable
-          accessibilityRole="button"
+        <RippleButton
+          size="lg"
+          variant="default"
+          theme={activeMode}
+          icon={<ArrowRightGlyph color={colors.actionLabel} size={15} />}
+          iconPosition="end"
           accessibilityLabel={actionLabel}
           onPress={onActionPress}
-          onPressIn={handlePressIn}
-          onPressOut={handlePressOut}
-          style={[styles.action, isActionPressed ? styles.actionPressed : null]}
+          style={styles.action}
         >
-          <Text style={styles.actionLabel} numberOfLines={1}>
-            {actionLabel}
-          </Text>
-          <ArrowRightGlyph />
-        </Pressable>
+          {actionLabel}
+        </RippleButton>
       )}
     </View>
   );
@@ -230,25 +247,9 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   action: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
     marginTop: 24,
-    height: ACTION_HEIGHT,
-    paddingHorizontal: ACTION_HORIZONTAL_PADDING,
     borderRadius: ACTION_HEIGHT / 2,
-    borderWidth: 1,
-    borderColor: COLORS.actionBorder,
-    backgroundColor: COLORS.action,
-  },
-  actionPressed: {
-    backgroundColor: COLORS.actionPressed,
-  },
-  actionLabel: {
-    fontSize: 14,
-    fontWeight: "500",
-    letterSpacing: -0.1,
-    color: COLORS.actionLabel,
+    paddingHorizontal: ACTION_HORIZONTAL_PADDING,
   },
 });
 

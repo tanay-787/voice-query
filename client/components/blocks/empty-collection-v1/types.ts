@@ -24,6 +24,7 @@ export interface IEmptyCollectionState {
   photos?: ImageSourcePropType[];
   hideAction?: boolean;
   animated?: boolean;
+  theme?: "light" | "dark";
   style?: StyleProp<ViewStyle>;
   onActionPress?: () => void;
 }

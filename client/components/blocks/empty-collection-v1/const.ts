@@ -44,13 +44,29 @@ export const ACTION_HEIGHT = 40;
 
 export const ACTION_HORIZONTAL_PADDING = 18;
 
-export const COLORS = {
-  screen: "#f7f7f6",
-  card: "#ffffff",
-  placeholder: "#e8e8e6",
-  title: "#1a1a1a",
-  action: "#1f1f1f",
-  actionPressed: "#0a0a0a",
-  actionBorder: "#b9b9b8",
-  actionLabel: "#f3f1f1",
+import { theme } from "@/theme";
+
+export const EMPTY_COLLECTION_THEME = {
+  light: {
+    screen: theme.light.background,
+    card: theme.light.surface,
+    placeholder: theme.light.surfaceMuted,
+    title: theme.light.textPrimary,
+    action: theme.light.actionPrimary,
+    actionPressed: theme.light.actionPrimaryPressed,
+    actionBorder: theme.light.borderSubtle,
+    actionLabel: theme.light.actionPrimaryLabel,
+  },
+  dark: {
+    screen: theme.dark.background,
+    card: theme.light.surface,
+    placeholder: theme.dark.surfaceMuted,
+    title: theme.dark.textPrimary,
+    action: theme.dark.actionPrimary,
+    actionPressed: theme.dark.actionPrimaryPressed,
+    actionBorder: theme.dark.borderSubtle,
+    actionLabel: theme.dark.actionPrimaryLabel,
+  },
 } as const;
+
+export const COLORS = EMPTY_COLLECTION_THEME.light;

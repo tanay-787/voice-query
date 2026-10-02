@@ -5,13 +5,17 @@ import { StatusBar } from "expo-status-bar";
 import { useNavigation } from "expo-router";
 import type { DrawerNavigationProp } from "expo-router/drawer";
 import * as DocumentPicker from "expo-document-picker";
+import { Feather } from "@expo/vector-icons";
+import { RippleButton } from "@/components/primitives/ripple-button";
 import { EmptyCollectionState } from "@/components/blocks/empty-collection-v1";
 import { useOnboarding } from "@/context/onboarding-context";
+import { useTheme } from "@/context/theme-context";
 
 export default function DocumentCanvasScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<DrawerNavigationProp<any>>();
   const { resetOnboarding } = useOnboarding();
+  const { theme, isDark } = useTheme();
 
   const handlePickDocument = async () => {
     try {
@@ -28,22 +32,28 @@ export default function DocumentCanvasScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="dark" />
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <StatusBar style={isDark ? "light" : "dark"} />
 
       {/* Top Header with Drawer Trigger & Debug Reset */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Pressable
-          accessibilityRole="button"
+      <View
+        style={[
+          styles.header,
+          {
+            paddingTop: insets.top + 8,
+            backgroundColor: theme.background,
+          },
+        ]}
+      >
+        <RippleButton
+          size="sm"
+          variant="default"
           accessibilityLabel="Open Sessions"
-          style={({ pressed }) => [
-            styles.drawerButton,
-            pressed && styles.drawerButtonPressed,
-          ]}
+          icon={<Feather name="menu" size={13} color={theme.actionPrimaryLabel} />}
           onPress={() => navigation.openDrawer()}
         >
-          <Text style={styles.drawerButtonText}>☰ Sessions</Text>
-        </Pressable>
+          Sessions
+        </RippleButton>
 
         <Pressable
           accessibilityRole="button"
@@ -51,7 +61,9 @@ export default function DocumentCanvasScreen() {
           style={styles.debugButton}
           onPress={resetOnboarding}
         >
-          <Text style={styles.debugButtonText}>Reset Onboarding</Text>
+          <Text style={[styles.debugButtonText, { color: theme.textTertiary }]}>
+            Reset Onboarding
+          </Text>
         </Pressable>
       </View>
 
@@ -68,7 +80,6 @@ export default function DocumentCanvasScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f7f7f6",
   },
   header: {
     paddingHorizontal: 20,
@@ -76,30 +87,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#f7f7f6",
     zIndex: 10,
-  },
-  drawerButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: "#1f1f1f",
-  },
-  drawerButtonPressed: {
-    backgroundColor: "#0a0a0a",
-  },
-  drawerButtonText: {
-    color: "#f3f1f1",
-    fontSize: 13,
-    fontWeight: "600",
-    letterSpacing: -0.2,
   },
   debugButton: {
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   debugButtonText: {
-    color: "#999999",
     fontSize: 12,
   },
 });
