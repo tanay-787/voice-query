@@ -27,6 +27,7 @@ import Animated, {
 import { Feather } from "@expo/vector-icons";
 
 import { createCompoundComponent } from "@/components/utils/create-compound-component";
+import { useThemeMode } from "@/context/theme-context";
 import { RippleButtonContext, useRippleButton } from "./context";
 import {
   RIPPLE_BUTTON_DISABLED_OPACITY,
@@ -54,7 +55,7 @@ const RippleButtonRoot: React.FC<IRippleButtonRoot> = ({
   children,
   variant = "default",
   size = "md",
-  theme = "dark",
+  theme: themeProp,
   disabled = false,
   loading = false,
   disableRipple = false,
@@ -67,7 +68,8 @@ const RippleButtonRoot: React.FC<IRippleButtonRoot> = ({
   style,
   testID,
 }): React.JSX.Element => {
-  const palette = RIPPLE_BUTTON_THEME[theme][variant];
+  const activeTheme = useThemeMode(themeProp);
+  const palette = RIPPLE_BUTTON_THEME[activeTheme][variant];
   const metrics = RIPPLE_BUTTON_METRICS[size];
   const isLocked = disabled || loading;
 
@@ -89,7 +91,7 @@ const RippleButtonRoot: React.FC<IRippleButtonRoot> = ({
     () => ({
       variant,
       size,
-      theme,
+      theme: activeTheme,
       palette,
       metrics,
       disabled,
@@ -100,7 +102,7 @@ const RippleButtonRoot: React.FC<IRippleButtonRoot> = ({
     [
       variant,
       size,
-      theme,
+      activeTheme,
       palette,
       metrics,
       disabled,
