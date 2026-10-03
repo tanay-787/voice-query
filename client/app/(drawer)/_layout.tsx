@@ -1,5 +1,11 @@
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import {
+  AppState,
+  type AppStateStatus,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Drawer,
@@ -37,6 +43,27 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const [selectedSession, setSelectedSession] = React.useState<number>(0);
+  const appState = React.useRef<AppStateStatus>(AppState.currentState);
+
+  React.useEffect(() => {
+    const subscription = AppState.addEventListener(
+      "change",
+      (nextAppState: AppStateStatus) => {
+        if (
+          appState.current.match(/inactive|background/) &&
+          nextAppState === "active"
+        ) {
+          // Dismiss the drawer when the app resumes from the background
+          props.navigation.closeDrawer();
+        }
+        appState.current = nextAppState;
+      }
+    );
+
+    return () => {
+      subscription.remove();
+    };
+  }, [props.navigation]);
 
   return (
     <DrawerContentScrollView
