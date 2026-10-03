@@ -1,5 +1,12 @@
 import React from "react";
 import { Stack } from "expo-router";
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+  useFonts,
+} from "@expo-google-fonts/inter";
 import { OnboardingProvider, useOnboarding } from "@/context/onboarding-context";
 import { ThemeProvider, useTheme } from "@/context/theme-context";
 
@@ -30,6 +37,17 @@ function RootNavigation() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  });
+
+  if (!fontsLoaded) {
+    return null;
+  }
+
   return (
     <ThemeProvider>
       <OnboardingProvider>
