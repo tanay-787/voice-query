@@ -24,7 +24,7 @@ Operating guidelines and repository conventions for AI coding agents working on 
 * **UI Component Library**: **Reacticx** (`rit3zh/reacticx`).
   * Configured via `client/component.config.json`.
   * Add components using: `pnpm dlx reacticx add <component>` inside `client/`.
-* **Runtime Target**: Currently operating in **Expo Go SDK 57** mode.
+* **Runtime Target**: Operating in **Expo Dev Client SDK 57** mode (`expo-dev-client`).
   * Install native modules using: `pnpm exec expo install <package-name>` inside `client/`.
   * Verify official documentation before adding dependencies.
 

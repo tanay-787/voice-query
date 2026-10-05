@@ -8,6 +8,7 @@
     "scheme": "voicequery",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "bundleIdentifier": "com.voicequery.app",
       "icon": "./assets/expo.icon",
       "supportsTablet": true,
       "infoPlist": {
@@ -26,6 +27,7 @@
       }
     },
     "android": {
+      "package": "com.voicequery.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -34,7 +36,11 @@
       },
       "permissions": [
         "RECORD_AUDIO",
-        "MODIFY_AUDIO_SETTINGS"
+        "MODIFY_AUDIO_SETTINGS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
       "predictiveBackGestureEnabled": false,
       "intentFilters": [
@@ -109,6 +115,16 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "expo-navigation-bar": {
+        "enforceContrast": false
+      },
+      "eas": {
+        "projectId": "bd8e7909-0cdc-4db7-be2b-2c922f59549a"
+      }
+    },
+    "owner": "tanay22"
   }
 }
