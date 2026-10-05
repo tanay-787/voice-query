@@ -19,8 +19,6 @@ import { SegmentedControlPresets, SHADOW } from "./presets";
 import type { ISegmentedControl } from "./types";
 import { GestureDetector, Gesture } from "react-native-gesture-handler";
 import { BlurView, type BlurViewProps } from "expo-blur";
-import { impactAsync, ImpactFeedbackStyle } from "expo-haptics";
-import { scheduleOnRN } from "react-native-worklets";
 import { useThemeMode } from "@/context/theme-context";
 
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
@@ -69,20 +67,21 @@ const SegmentedControl: React.FC<ISegmentedControl> &
     : (numericWidth - 4) / tabsCount;
 
   const tabTranslate = useSharedValue<number>(currentIndex * translateValue);
+  const activeIndex = useSharedValue<number>(currentIndex);
+  const dragStartIndex = useSharedValue<number>(currentIndex);
   const blurAmount = useSharedValue<number>(0);
   const isDragging = useSharedValue<boolean>(false);
-  const dragStartIndex = useRef<number>(currentIndex);
 
   const activeScale = useSharedValue(1);
 
   const triggerBlur = useCallback(() => {
     blurAmount.value = withSequence<number>(
       withTiming<number>(10, {
-        duration: 400,
+        duration: 200,
         easing: Easing.inOut(Easing.ease),
       }),
       withTiming<number>(0, {
-        duration: 400,
+        duration: 200,
         easing: Easing.inOut(Easing.ease),
       }),
     );
@@ -90,29 +89,30 @@ const SegmentedControl: React.FC<ISegmentedControl> &
 
   const triggerTapScale = useCallback(() => {
     if (disableScaleEffect) return;
-    const targetScale = isVertical ? 1.015 : 1.25;
+    const targetScale = isVertical ? 1.015 : 1.1;
     activeScale.value = withSequence<number>(
-      withTiming<number>(targetScale, { duration: 350 }),
-      withSpring<number>(1, { stiffness: 10, damping: 5, mass: 0.8 }),
+      withTiming<number>(targetScale, { duration: 150 }),
+      withSpring<number>(1, { stiffness: 180, damping: 18 }),
     );
   }, [disableScaleEffect, isVertical]);
 
   const memoizedTabPressCallback = useCallback(
     (index: number) => {
+      activeIndex.value = index;
       onChange(index);
       if (!isDragging.value) {
         triggerBlur();
         triggerTapScale();
-        impactAsync(ImpactFeedbackStyle.Medium);
       }
     },
     [onChange, triggerBlur, triggerTapScale],
   );
 
   useEffect(() => {
+    activeIndex.value = currentIndex;
     tabTranslate.value = withSpring<number>(currentIndex * translateValue, {
-      stiffness: 80,
-      damping: 90,
+      stiffness: 160,
+      damping: 20,
       mass: 1,
     });
   }, [currentIndex, translateValue]);
@@ -145,14 +145,13 @@ const SegmentedControl: React.FC<ISegmentedControl> &
     .minDistance(10)
     .onStart(() => {
       isDragging.value = true;
-      dragStartIndex.current = currentIndex;
+      dragStartIndex.value = activeIndex.value;
       if (disableScaleEffect) return;
-      const dragScale = isVertical ? 1.02 : 1.2;
+      const dragScale = isVertical ? 1.02 : 1.1;
       activeScale.value = withSpring<number>(dragScale, {
         stiffness: 300,
         damping: 15,
       });
-      scheduleOnRN(impactAsync, ImpactFeedbackStyle.Medium);
     })
     .onUpdate((event) => {
       const step = isVertical ? itemHeight : (numericWidth - 4) / tabsCount;
@@ -160,20 +159,29 @@ const SegmentedControl: React.FC<ISegmentedControl> &
       const rawIndex = Math.floor(pos / step);
       const newIndex = Math.max(0, Math.min(tabsCount - 1, rawIndex));
 
-      if (newIndex !== currentIndex && newIndex >= 0 && newIndex < tabsCount) {
-        scheduleOnRN(onChange, newIndex);
-        scheduleOnRN(impactAsync, ImpactFeedbackStyle.Rigid);
+      if (newIndex !== activeIndex.value && newIndex >= 0 && newIndex < tabsCount) {
+        activeIndex.value = newIndex;
+        runOnJS(onChange)(newIndex);
       }
     })
-    .onEnd(() => {
+    .onEnd((event) => {
+      const step = isVertical ? itemHeight : (numericWidth - 4) / tabsCount;
+      const pos = isVertical ? event.y : event.x;
+      const rawIndex = Math.floor(pos / step);
+      const finalIndex = Math.max(0, Math.min(tabsCount - 1, rawIndex));
+
+      if (finalIndex !== activeIndex.value && finalIndex >= 0 && finalIndex < tabsCount) {
+        activeIndex.value = finalIndex;
+        runOnJS(onChange)(finalIndex);
+      }
+
       isDragging.value = false;
       activeScale.value = withSpring<number>(1, {
         stiffness: 200,
         damping: 20,
       });
-      if (currentIndex !== dragStartIndex.current) {
-        scheduleOnRN(triggerBlur);
-        scheduleOnRN(impactAsync, ImpactFeedbackStyle.Medium);
+      if (finalIndex !== dragStartIndex.value) {
+        runOnJS(triggerBlur)();
       }
     })
     .onFinalize(() => {
