@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { StyleSheet, Text, View, Pressable } from "react-native";
+import React from "react";
+import { StyleSheet, Text, View, Pressable, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useNavigation } from "expo-router";
@@ -11,11 +11,7 @@ import { EmptyCollectionState } from "@/components/blocks/empty-collection-v1";
 import { PdfCanvas } from "@/components/organisms/pdf-canvas";
 import { useOnboarding } from "@/context/onboarding-context";
 import { useTheme } from "@/context/theme-context";
-
-interface SelectedDocument {
-  uri: string;
-  name: string;
-}
+import { useDocumentStore } from "@/store/document-store";
 
 export default function DocumentCanvasScreen() {
   const insets = useSafeAreaInsets();
@@ -23,7 +19,21 @@ export default function DocumentCanvasScreen() {
   const { resetOnboarding } = useOnboarding();
   const { theme, isDark } = useTheme();
 
-  const [activeDoc, setActiveDoc] = useState<SelectedDocument | null>(null);
+  const documents = useDocumentStore((state) => state.documents);
+  const activeDocId = useDocumentStore((state) => state.activeDocId);
+  const initialize = useDocumentStore((state) => state.initialize);
+  const importDocument = useDocumentStore((state) => state.importDocument);
+  const updatePageProgress = useDocumentStore((state) => state.updatePageProgress);
+  const deleteDocument = useDocumentStore((state) => state.deleteDocument);
+
+  React.useEffect(() => {
+    initialize();
+  }, [initialize]);
+
+  // Active doc is either matched by activeDocId or fallback to first document if available
+  const activeDoc =
+    documents.find((doc) => doc.id === activeDocId) ??
+    (documents.length > 0 ? documents[0] : null);
 
   const handlePickDocument = async () => {
     try {
@@ -33,18 +43,33 @@ export default function DocumentCanvasScreen() {
       });
       if (!result.canceled && result.assets?.[0]) {
         const asset = result.assets[0];
-        setActiveDoc({
+        await importDocument({
           uri: asset.uri,
           name: asset.name,
+          size: asset.size,
         });
       }
     } catch (error) {
-      console.warn("Document picker error", error);
+      console.warn("[DocumentCanvasScreen] Picker error:", error);
     }
   };
 
-  const handleCloseDocument = () => {
-    setActiveDoc(null);
+  const handleDeleteActiveDocument = () => {
+    if (!activeDoc) return;
+    Alert.alert(
+      "Delete Document",
+      `Are you sure you want to delete "${activeDoc.name}"? This will delete the session and its saved file.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            deleteDocument(activeDoc.id);
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -84,14 +109,24 @@ export default function DocumentCanvasScreen() {
         ) : null}
 
         {activeDoc ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Close document"
-            style={[styles.closeButton, { backgroundColor: theme.surfaceMuted }]}
-            onPress={handleCloseDocument}
-          >
-            <Feather name="x" size={16} color={theme.textPrimary} />
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Import new document"
+              style={[styles.headerActionButton, { backgroundColor: theme.surfaceMuted }]}
+              onPress={handlePickDocument}
+            >
+              <Feather name="plus" size={16} color={theme.textPrimary} />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Delete document"
+              style={[styles.headerActionButton, { backgroundColor: theme.surfaceMuted }]}
+              onPress={handleDeleteActiveDocument}
+            >
+              <Feather name="trash-2" size={15} color={theme.destructive} />
+            </Pressable>
+          </View>
         ) : (
           <Pressable
             accessibilityRole="button"
@@ -109,7 +144,41 @@ export default function DocumentCanvasScreen() {
       {/* Main Content: Native Canvas vs Empty State */}
       {activeDoc ? (
         <View style={styles.canvasContainer}>
-          <PdfCanvas sourceUri={activeDoc.uri} />
+          <PdfCanvas
+            key={activeDoc.id}
+            sourceUri={activeDoc.uri}
+            initialPage={activeDoc.currentPage}
+            onLoadComplete={(total) => {
+              updatePageProgress(activeDoc.id, activeDoc.currentPage, total);
+            }}
+            onPageChange={(page, total) => {
+              updatePageProgress(activeDoc.id, page, total);
+            }}
+          />
+
+          {/* Top-Right Floating Page Pill */}
+          {activeDoc.pageCount > 0 && (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.pagePill,
+                {
+                  backgroundColor: isDark
+                    ? "rgba(24, 24, 27, 0.88)"
+                    : "rgba(255, 255, 255, 0.90)",
+                  borderColor: theme.borderSubtle,
+                },
+              ]}
+            >
+              <Text style={[styles.pagePillText, { color: theme.textPrimary }]}>
+                {activeDoc.currentPage}
+                <Text style={{ color: theme.textTertiary }}>
+                  {" "}
+                  / {activeDoc.pageCount}
+                </Text>
+              </Text>
+            </View>
+          )}
         </View>
       ) : (
         <EmptyCollectionState
@@ -145,7 +214,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     letterSpacing: -0.2,
   },
-  closeButton: {
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  headerActionButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
@@ -161,5 +235,26 @@ const styles = StyleSheet.create({
   },
   canvasContainer: {
     flex: 1,
+    position: "relative",
+  },
+  pagePill: {
+    position: "absolute",
+    top: 12,
+    right: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
+    zIndex: 10,
+  },
+  pagePillText: {
+    fontSize: 12,
+    fontWeight: "600",
+    letterSpacing: -0.2,
   },
 });
