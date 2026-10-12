@@ -1,7 +1,9 @@
 import React from "react";
 import {
+  Alert,
   AppState,
   type AppStateStatus,
+  Pressable,
   StyleSheet,
   Text,
   View,
@@ -12,38 +14,44 @@ import {
   DrawerContentScrollView,
   type DrawerContentComponentProps,
 } from "expo-router/drawer";
+import * as DocumentPicker from "expo-document-picker";
 import { Feather } from "@expo/vector-icons";
 import { useTheme } from "@/context/theme-context";
 import SegmentedControl from "@/components/organisms/segmented-control";
+import { useDocumentStore } from "@/store/document-store";
 
-const SESSIONS = [
-  {
-    id: "canvas-active",
-    title: "Canvas Workspace",
-    preview: "Active session • Just now",
-  },
-  {
-    id: "briefing-1",
-    title: "Voice Query Overview",
-    preview: "14 audio notes • 12m ago",
-  },
-  {
-    id: "briefing-2",
-    title: "Monorepo Migration",
-    preview: "Expo SDK 57 • 2h ago",
-  },
-  {
-    id: "briefing-3",
-    title: "Design System Specs",
-    preview: "3 documents • Yesterday",
-  },
-];
+function formatTimeAgo(timestamp: number): string {
+  const diffSec = Math.floor((Date.now() - timestamp) / 1000);
+  if (diffSec < 60) return "Just now";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour}h ago`;
+  const diffDays = Math.floor(diffHour / 24);
+  if (diffDays === 1) return "Yesterday";
+  return `${diffDays}d ago`;
+}
 
 function CustomDrawerContent(props: DrawerContentComponentProps) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-  const [selectedSession, setSelectedSession] = React.useState<number>(0);
   const appState = React.useRef<AppStateStatus>(AppState.currentState);
+
+  const documents = useDocumentStore((state) => state.documents);
+  const activeDocId = useDocumentStore((state) => state.activeDocId);
+  const initialize = useDocumentStore((state) => state.initialize);
+  const selectDocument = useDocumentStore((state) => state.selectDocument);
+  const importDocument = useDocumentStore((state) => state.importDocument);
+  const deleteDocument = useDocumentStore((state) => state.deleteDocument);
+
+  React.useEffect(() => {
+    initialize();
+  }, [initialize]);
+
+  const activeIndex = Math.max(
+    0,
+    documents.findIndex((doc) => doc.id === activeDocId)
+  );
 
   React.useEffect(() => {
     const subscription = AppState.addEventListener(
@@ -65,6 +73,50 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
     };
   }, [props.navigation]);
 
+  const handlePickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/pdf"],
+        copyToCacheDirectory: true,
+      });
+      if (!result.canceled && result.assets?.[0]) {
+        const asset = result.assets[0];
+        await importDocument({
+          uri: asset.uri,
+          name: asset.name,
+          size: asset.size,
+        });
+        props.navigation.closeDrawer();
+      }
+    } catch (err) {
+      console.warn("[CustomDrawerContent] Picker error:", err);
+    }
+  };
+
+  const closeDrawerTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (closeDrawerTimeoutRef.current) {
+        clearTimeout(closeDrawerTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleSelectSession = (index: number) => {
+    const doc = documents[index];
+    if (doc) {
+      selectDocument(doc.id);
+      if (closeDrawerTimeoutRef.current) {
+        clearTimeout(closeDrawerTimeoutRef.current);
+      }
+      // Allow segmented control spring slide & scale animation to finish before closing drawer
+      closeDrawerTimeoutRef.current = setTimeout(() => {
+        props.navigation.closeDrawer();
+      }, 280);
+    }
+  };
+
   return (
     <DrawerContentScrollView
       {...props}
@@ -84,55 +136,127 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
       </View>
 
       <View style={styles.sessionsContainer}>
-        <Text style={[styles.sectionHeader, { color: theme.textSecondary }]}>
-          Recents
-        </Text>
-        <SegmentedControl
-          orientation="vertical"
-          width="100%"
-          itemHeight={62}
-          borderRadius={14}
-          hideDividers
-          currentIndex={selectedSession}
-          onChange={setSelectedSession}
-        >
-          {SESSIONS.map((session, index) => {
-            const isSelected = selectedSession === index;
-            return (
-              <View key={session.id} style={styles.sessionItem}>
-                <View style={styles.sessionTextContainer}>
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      styles.sessionTitle,
-                      {
-                        color: isSelected
-                          ? theme.textPrimary
-                          : theme.textSecondary,
-                        fontWeight: isSelected ? "600" : "500",
-                      },
-                    ]}
+        <View style={styles.sectionHeaderRow}>
+          <Text style={[styles.sectionHeader, { color: theme.textSecondary }]}>
+            Recents
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Import Document"
+            style={[styles.importIconButton, { backgroundColor: theme.surfaceMuted }]}
+            onPress={handlePickDocument}
+          >
+            <Feather name="plus" size={14} color={theme.textPrimary} />
+          </Pressable>
+        </View>
+
+        {documents.length > 0 ? (
+          <SegmentedControl
+            orientation="vertical"
+            width="100%"
+            itemHeight={62}
+            borderRadius={14}
+            hideDividers
+            currentIndex={activeIndex}
+            onChange={handleSelectSession}
+          >
+            {documents.map((doc, index) => {
+              const isSelected = activeIndex === index;
+              return (
+                <View key={doc.id} style={styles.sessionItem}>
+                  <View style={styles.sessionTextContainer}>
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.sessionTitle,
+                        {
+                          color: isSelected
+                            ? theme.textPrimary
+                            : theme.textSecondary,
+                          fontWeight: isSelected ? "600" : "500",
+                        },
+                      ]}
+                    >
+                      {doc.name}
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.sessionPreview,
+                        {
+                          color: isSelected
+                            ? theme.textSecondary
+                            : theme.textTertiary,
+                        },
+                      ]}
+                    >
+                      {`Page ${doc.currentPage} of ${doc.pageCount} • ${formatTimeAgo(
+                        doc.lastOpenedAt
+                      )}`}
+                    </Text>
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Delete ${doc.name}`}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    style={styles.deleteIconButton}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      Alert.alert(
+                        "Delete Document",
+                        `Remove "${doc.name}" and delete its local copy?`,
+                        [
+                          { text: "Cancel", style: "cancel" },
+                          {
+                            text: "Delete",
+                            style: "destructive",
+                            onPress: () => deleteDocument(doc.id),
+                          },
+                        ]
+                      );
+                    }}
                   >
-                    {session.title}
-                  </Text>
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      styles.sessionPreview,
-                      {
-                        color: isSelected
-                          ? theme.textSecondary
-                          : theme.textTertiary,
-                      },
-                    ]}
-                  >
-                    {session.preview}
-                  </Text>
+                    <Feather
+                      name="trash-2"
+                      size={13}
+                      color={isSelected ? theme.textSecondary : theme.textTertiary}
+                    />
+                  </Pressable>
                 </View>
-              </View>
-            );
-          })}
-        </SegmentedControl>
+              );
+            })}
+          </SegmentedControl>
+        ) : (
+          <View
+            style={[
+              styles.emptyContainer,
+              { backgroundColor: theme.surfaceMuted },
+            ]}
+          >
+            <Feather name="folder" size={24} color={theme.textTertiary} />
+            <Text style={[styles.emptyTitle, { color: theme.textSecondary }]}>
+              No documents yet
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Pick a document"
+              style={[
+                styles.emptyActionButton,
+                { backgroundColor: theme.actionPrimary },
+              ]}
+              onPress={handlePickDocument}
+            >
+              <Text
+                style={[
+                  styles.emptyActionText,
+                  { color: theme.actionPrimaryLabel },
+                ]}
+              >
+                Import PDF
+              </Text>
+            </Pressable>
+          </View>
+        )}
       </View>
     </DrawerContentScrollView>
   );
@@ -207,20 +331,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginTop: 8,
   },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+    paddingHorizontal: 6,
+  },
   sectionHeader: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
     fontWeight: "600",
     letterSpacing: 0.2,
-    marginBottom: 8,
-    paddingHorizontal: 6,
+  },
+  importIconButton: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
   },
   sessionItem: {
-    justifyContent: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 6,
+    width: "100%",
   },
   sessionTextContainer: {
+    flex: 1,
     justifyContent: "center",
+    marginRight: 8,
   },
   sessionTitle: {
     fontSize: 14,
@@ -230,5 +371,32 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
     letterSpacing: -0.1,
+  },
+  deleteIconButton: {
+    padding: 6,
+    borderRadius: 6,
+  },
+  emptyContainer: {
+    borderRadius: 14,
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    marginTop: 4,
+  },
+  emptyTitle: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  emptyActionButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginTop: 4,
+  },
+  emptyActionText: {
+    fontSize: 12,
+    fontWeight: "600",
   },
 });
