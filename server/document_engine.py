@@ -1,48 +1,37 @@
 import io
 import re
 import json
-import sqlite3
 import time
 import httpx
+import hashlib
 from pypdf import PdfReader
 from azure.ai.inference import ChatCompletionsClient
 from azure.ai.inference.models import SystemMessage, UserMessage
 from azure.core.credentials import AzureKeyCredential
-import os
 from config import AZURE_AI_ENDPOINT, AZURE_AI_KEY, AZURE_AI_MODEL
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "documents.db")
-
-def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS documents (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        source_type TEXT NOT NULL,
-        source_uri TEXT,
-        page_count INTEGER,
-        full_text TEXT NOT NULL,
-        pages_json TEXT NOT NULL,
-        overview TEXT,
-        spoken_briefing TEXT,
-        key_takeaways_json TEXT,
-        definitions_json TEXT,
-        created_at REAL NOT NULL
-    );
-    """)
-    conn.commit()
-    conn.close()
-
-init_db()
+from storage import delete_document_blob
+from cosmos_db import (
+    save_document_cosmos,
+    get_document_cosmos,
+    get_document_by_hash_cosmos,
+    delete_document_cosmos,
+    save_document_pages_cosmos,
+    get_document_pages_cosmos,
+    delete_document_pages_cosmos,
+    save_interaction_cosmos,
+    get_interactions_cosmos,
+    delete_interactions_cosmos,
+)
 
 def get_azure_client():
     return ChatCompletionsClient(
         endpoint=AZURE_AI_ENDPOINT,
         credential=AzureKeyCredential(AZURE_AI_KEY)
     )
+
+def calculate_sha256(file_bytes: bytes) -> str:
+    """Calculates SHA-256 hash of file bytes for content deduplication."""
+    return hashlib.sha256(file_bytes).hexdigest()
 
 def extract_pdf_pages(file_bytes: bytes) -> tuple[str, list[dict], int]:
     """Extract page-by-page text from PDF file bytes."""
@@ -111,7 +100,6 @@ Respond strictly with valid JSON conforming to this schema:
 
 def generate_document_briefing(title_hint: str, document_text: str) -> dict:
     client = get_azure_client()
-    # Provide up to 40k chars for the initial briefing
     preview = document_text[:40000]
 
     prompt = f"Document Title Hint: {title_hint}\n\nDocument Content:\n{preview}"
@@ -129,58 +117,102 @@ def generate_document_briefing(title_hint: str, document_text: str) -> dict:
     try:
         return json.loads(raw_json)
     except Exception as e:
-        # Fallback if markdown fence was included
         match = re.search(r'\{.*\}', raw_json, re.DOTALL)
         if match:
             return json.loads(match.group(0))
         raise e
 
-def save_document(doc_id: str, title: str, source_type: str, source_uri: str, 
-                  page_count: int, full_text: str, pages: list[dict], briefing: dict):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-    INSERT OR REPLACE INTO documents 
-    (id, title, source_type, source_uri, page_count, full_text, pages_json, overview, spoken_briefing, key_takeaways_json, definitions_json, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        doc_id,
-        briefing.get("title", title),
-        source_type,
-        source_uri,
-        page_count,
-        full_text,
-        json.dumps(pages),
-        briefing.get("overview", ""),
-        briefing.get("spoken_briefing", ""),
-        json.dumps(briefing.get("key_takeaways", [])),
-        json.dumps(briefing.get("definitions", [])),
-        time.time()
-    ))
-    conn.commit()
-    conn.close()
+def save_document_and_pages(
+    doc_id: str,
+    title: str,
+    source_type: str,
+    page_count: int,
+    pages: list[dict],
+    briefing: dict,
+    file_hash: str | None = None,
+    blob_url: str | None = None,
+    file_size: int | None = None,
+) -> dict:
+    """
+    Saves document metadata to `documents` container,
+    page texts to `document_pages` container,
+    and initial briefing to `interactions` container.
+    """
+    now = time.time()
 
-def get_document(doc_id: str) -> dict | None:
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM documents WHERE id = ?", (doc_id,))
-    row = cursor.fetchone()
-    conn.close()
+    # 1. Save document metadata
+    doc_meta = {
+        "id": doc_id,
+        "name": briefing.get("title", title),
+        "source_type": source_type,
+        "file_hash": file_hash,
+        "blob_url": blob_url,
+        "size": file_size,
+        "page_count": page_count,
+        "status": "ready",
+        "created_at": now,
+        "updated_at": now,
+    }
+    save_document_cosmos(doc_meta)
 
-    if not row:
-        return None
+    # 2. Save individual pages in document_pages container
+    if pages:
+        save_document_pages_cosmos(doc_id, pages)
+
+    # 3. Save initial briefing interaction in interactions container
+    citations = []
+    for item in briefing.get("key_takeaways", []):
+        if isinstance(item, dict) and "page" in item:
+            citations.append({"page": item["page"]})
+
+    briefing_interaction = {
+        "id": f"int_{doc_id}_briefing",
+        "document_id": doc_id,
+        "type": "briefing",
+        "status": "completed",
+        "user_query": None,
+        "ai_response_text": briefing.get("spoken_briefing", ""),
+        "overview": briefing.get("overview", ""),
+        "key_takeaways": briefing.get("key_takeaways", []),
+        "definitions": briefing.get("definitions", []),
+        "citations": citations,
+        "created_at": now,
+        "updated_at": now,
+    }
+    save_interaction_cosmos(briefing_interaction)
 
     return {
-        "id": row[0],
-        "title": row[1],
-        "source_type": row[2],
-        "source_uri": row[3],
-        "page_count": row[4],
-        "full_text": row[5],
-        "pages": json.loads(row[6]),
-        "overview": row[7],
-        "spoken_briefing": row[8],
-        "key_takeaways": json.loads(row[9]),
-        "definitions": json.loads(row[10]),
-        "created_at": row[11]
+        "document": doc_meta,
+        "briefing": briefing_interaction
     }
+
+def get_document(doc_id: str) -> dict | None:
+    """Fetches document metadata from documents container."""
+    return get_document_cosmos(doc_id)
+
+def get_document_pages(
+    doc_id: str,
+    start_page: int | None = None,
+    end_page: int | None = None
+) -> list[dict]:
+    """Fetches pages from document_pages container."""
+    return get_document_pages_cosmos(doc_id, start_page, end_page)
+
+def get_document_interactions(doc_id: str) -> list[dict]:
+    """Fetches all interactions for a document in chronological order."""
+    return get_interactions_cosmos(doc_id)
+
+def get_document_by_hash(file_hash: str) -> dict | None:
+    """Performs an indexed lookup in Cosmos DB by SHA-256 hash."""
+    return get_document_by_hash_cosmos(file_hash)
+
+def delete_document(doc_id: str) -> bool:
+    """
+    Deletes document metadata, pages, and interactions from Cosmos DB,
+    and purges the raw PDF from Azure Blob Storage.
+    """
+    deleted_db = delete_document_cosmos(doc_id)
+    delete_document_pages_cosmos(doc_id)
+    delete_interactions_cosmos(doc_id)
+    deleted_blob = delete_document_blob(doc_id)
+    return deleted_db or deleted_blob
