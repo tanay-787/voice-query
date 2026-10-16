@@ -28,11 +28,20 @@ EXTRACTED DOCUMENT CONTENT:
 {document_text}
 """
 
-def get_azure_client():
-    return ChatCompletionsClient(
-        endpoint=AZURE_AI_ENDPOINT,
-        credential=AzureKeyCredential(AZURE_AI_KEY)
-    )
+_azure_client: ChatCompletionsClient | None = None
+
+def get_azure_client() -> ChatCompletionsClient:
+    """
+    Returns a cached ChatCompletionsClient instance.
+    Reuses the HTTP connection pool and TLS session across streaming turns.
+    """
+    global _azure_client
+    if _azure_client is None:
+        _azure_client = ChatCompletionsClient(
+            endpoint=AZURE_AI_ENDPOINT,
+            credential=AzureKeyCredential(AZURE_AI_KEY)
+        )
+    return _azure_client
 
 def retrieve_relevant_document_text(
     doc_id: str,

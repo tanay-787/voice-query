@@ -24,11 +24,7 @@ from cosmos_db import (
     delete_interactions_cosmos,
 )
 
-def get_azure_client():
-    return ChatCompletionsClient(
-        endpoint=AZURE_AI_ENDPOINT,
-        credential=AzureKeyCredential(AZURE_AI_KEY)
-    )
+from dialogue_engine import get_azure_client
 
 def calculate_sha256(file_bytes: bytes) -> str:
     """Calculates SHA-256 hash of file bytes for content deduplication."""
