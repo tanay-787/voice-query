@@ -1,5 +1,6 @@
 import os
 import time
+import concurrent.futures
 from azure.cosmos import CosmosClient, exceptions
 from config import (
     AZURE_COSMOS_ENDPOINT,
@@ -145,13 +146,18 @@ def save_document_pages_cosmos(doc_id: str, pages: list[dict]) -> None:
     """
     Upserts page text chunks into document_pages container.
     Partition key: /document_id
+    Uses a worker pool to parallelize batch writes and minimize network latency.
     """
     container = get_pages_container()
     if container is None:
         raise RuntimeError("Cosmos DB pages container is not configured.")
 
+    if not pages:
+        return
+
     now = time.time()
-    for page_entry in pages:
+
+    def _upsert_page(page_entry: dict):
         page_num = page_entry["page"]
         text = page_entry.get("text", "")
         item = {
@@ -162,6 +168,14 @@ def save_document_pages_cosmos(doc_id: str, pages: list[dict]) -> None:
             "created_at": now
         }
         container.upsert_item(body=item)
+
+    if len(pages) <= 2:
+        for p in pages:
+            _upsert_page(p)
+    else:
+        max_workers = min(10, len(pages))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            list(executor.map(_upsert_page, pages))
 
 def get_document_pages_cosmos(
     doc_id: str,
@@ -204,6 +218,7 @@ def get_document_pages_cosmos(
 def delete_document_pages_cosmos(doc_id: str) -> int:
     """
     Deletes all page items for a document in the document_pages container.
+    Parallelizes item deletion over a thread pool.
     """
     container = get_pages_container()
     if container is None:
@@ -217,15 +232,23 @@ def delete_document_pages_cosmos(doc_id: str) -> int:
         partition_key=doc_id
     ))
 
-    deleted_count = 0
-    for p in pages:
+    if not pages:
+        return 0
+
+    def _delete_page_item(p: dict) -> int:
         try:
             container.delete_item(item=p["id"], partition_key=doc_id)
-            deleted_count += 1
+            return 1
         except Exception as e:
             print(f"[CosmosDB] Failed to delete page item {p['id']}: {e}")
+            return 0
 
-    return deleted_count
+    if len(pages) <= 2:
+        return sum(_delete_page_item(p) for p in pages)
+
+    max_workers = min(10, len(pages))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        return sum(executor.map(_delete_page_item, pages))
 
 # ==========================================
 # 3. Interactions Container Operations (/document_id)
@@ -266,6 +289,7 @@ def get_interactions_cosmos(doc_id: str) -> list[dict]:
 def delete_interactions_cosmos(doc_id: str) -> int:
     """
     Deletes all interaction items for a document in the interactions container.
+    Parallelizes item deletion over a thread pool.
     """
     container = get_interactions_container()
     if container is None:
@@ -279,12 +303,20 @@ def delete_interactions_cosmos(doc_id: str) -> int:
         partition_key=doc_id
     ))
 
-    deleted_count = 0
-    for item in items:
+    if not items:
+        return 0
+
+    def _delete_interaction_item(item: dict) -> int:
         try:
             container.delete_item(item=item["id"], partition_key=doc_id)
-            deleted_count += 1
+            return 1
         except Exception as e:
             print(f"[CosmosDB] Failed to delete interaction item {item['id']}: {e}")
+            return 0
 
-    return deleted_count
+    if len(items) <= 2:
+        return sum(_delete_interaction_item(item) for item in items)
+
+    max_workers = min(10, len(items))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        return sum(executor.map(_delete_interaction_item, items))
