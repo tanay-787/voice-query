@@ -4,10 +4,11 @@ import json
 import hashlib
 from typing import Optional, List, Dict, Any
 
-from fastapi import FastAPI, UploadFile, File, Form, Query, HTTPException, status
+from fastapi import FastAPI, UploadFile, File, Form, Query, HTTPException, Request, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from config import PORT, DEBUG
 from document_engine import (
@@ -23,7 +24,8 @@ from document_engine import (
     delete_document,
     calculate_sha256,
 )
-from storage import upload_document_blob, generate_sas_url
+from storage import upload_document_blob, delete_document_blob, generate_sas_url
+from cosmos_db import count_documents_by_hash_cosmos
 from dialogue_engine import stream_speech_answer
 
 app = FastAPI(
@@ -32,28 +34,54 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Enable CORS for mobile client access
+# Enable standard CORS for mobile and web client access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ==========================================
+# Dual-Compatible Exception Handlers
+# (Ensures both {"error": ...} and {"detail": ...} work)
+# ==========================================
+
+@app.exception_handler(HTTPException)
+def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": exc.detail,
+            "detail": exc.detail
+        }
+    )
+
+@app.exception_handler(RequestValidationError)
+def validation_exception_handler(request: Request, exc: RequestValidationError):
+    error_msg = "; ".join([f"{err['loc'][-1]}: {err['msg']}" for err in exc.errors()])
+    return JSONResponse(
+        status_code=getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", 422),
+        content={
+            "error": error_msg,
+            "detail": exc.errors()
+        }
+    )
 
 # ==========================================
 # Pydantic Request Models
 # ==========================================
 
 class ChatContext(BaseModel):
-    current_page: Optional[int] = 1
+    current_page: int = Field(default=1, ge=1)
 
 class ChatRequest(BaseModel):
     document_id: Optional[str] = None
     doc_id: Optional[str] = None
     question: Optional[str] = None
     query: Optional[str] = None
-    conversation_history: Optional[List[Dict[str, Any]]] = []
+    conversation_history: List[Dict[str, Any]] = Field(default_factory=list)
     context: Optional[ChatContext] = None
     interaction_id: Optional[str] = None
 
@@ -79,11 +107,16 @@ def health():
     }
 
 @app.post("/api/documents/upload")
-async def upload_pdf(
+def upload_pdf(
     file: UploadFile = File(...),
     id: Optional[str] = Form(None),
     client_doc_id: Optional[str] = Form(None)
 ):
+    """
+    Synchronous route handler executed on FastAPI's thread pool.
+    Prevents long-running PDF extraction, Azure AI calls, and Blob storage I/O
+    from blocking the main asyncio event loop.
+    """
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -93,8 +126,11 @@ async def upload_pdf(
     # Client-generated canonical ID (e.g. doc_1728... or client_doc_id)
     canonical_id = id or client_doc_id or f"doc_{int(time.time() * 1000)}_{uuid.uuid4().hex[:6]}"
 
+    blob_uploaded_by_this_req = False
+    file_hash = None
+
     try:
-        file_bytes = await file.read()
+        file_bytes = file.file.read()
         if not file_bytes:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -144,6 +180,7 @@ async def upload_pdf(
         # 3. Upload content-addressed blob to Azure Blob Storage (fatal on failure)
         try:
             blob_url = upload_document_blob(file_hash, file_bytes, filename)
+            blob_uploaded_by_this_req = True
         except Exception as storage_err:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -174,8 +211,15 @@ async def upload_pdf(
         }
 
     except HTTPException:
+        # Cleanup newly uploaded blob if subsequent processing failed and no other doc references it
+        if blob_uploaded_by_this_req and file_hash:
+            if count_documents_by_hash_cosmos(file_hash) == 0:
+                delete_document_blob(file_hash)
         raise
     except Exception as e:
+        if blob_uploaded_by_this_req and file_hash:
+            if count_documents_by_hash_cosmos(file_hash) == 0:
+                delete_document_blob(file_hash)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to process PDF: {str(e)}"
@@ -348,8 +392,8 @@ def remove_document(doc_id: str):
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
-                "success": False,
-                "message": "Partial deletion occurred. Please retry.",
+                "error": "Partial deletion occurred. Please retry.",
+                "detail": "Partial deletion occurred. Please retry.",
                 "details": result
             }
         )
