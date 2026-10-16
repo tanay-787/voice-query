@@ -141,7 +141,7 @@ def save_document_and_pages(
     """
     now = time.time()
 
-    # 1. Save document metadata
+    # 1. Save document metadata in 'processing' status
     doc_meta = {
         "id": doc_id,
         "name": briefing.get("title", title),
@@ -150,42 +150,59 @@ def save_document_and_pages(
         "blob_url": blob_url,
         "size": file_size,
         "page_count": page_count,
-        "status": "ready",
+        "status": "processing",
         "created_at": now,
         "updated_at": now,
     }
     save_document_cosmos(doc_meta)
 
-    # 2. Save individual pages in document_pages container
-    if pages:
-        save_document_pages_cosmos(doc_id, pages)
+    try:
+        # 2. Save individual pages in document_pages container
+        if pages:
+            save_document_pages_cosmos(doc_id, pages)
 
-    # 3. Save initial briefing interaction in interactions container
-    citations = []
-    for item in briefing.get("key_takeaways", []):
-        if isinstance(item, dict) and "page" in item:
-            citations.append({"page": item["page"]})
+        # 3. Save initial briefing interaction in interactions container
+        citations = []
+        for item in briefing.get("key_takeaways", []):
+            if isinstance(item, dict) and "page" in item:
+                citations.append({"page": item["page"]})
 
-    briefing_interaction = {
-        "id": f"int_{doc_id}_briefing",
-        "document_id": doc_id,
-        "type": "briefing",
-        "status": "completed",
-        "user_query": None,
-        "ai_response_text": briefing.get("spoken_briefing", ""),
-        "overview": briefing.get("overview", ""),
-        "key_takeaways": briefing.get("key_takeaways", []),
-        "definitions": briefing.get("definitions", []),
-        "citations": citations,
-        "created_at": now,
-        "updated_at": now,
-    }
-    save_interaction_cosmos(briefing_interaction)
+        briefing_interaction = {
+            "id": f"int_{doc_id}_briefing",
+            "document_id": doc_id,
+            "type": "briefing",
+            "status": "completed",
+            "user_query": None,
+            "ai_response_text": briefing.get("spoken_briefing", ""),
+            "overview": briefing.get("overview", ""),
+            "key_takeaways": briefing.get("key_takeaways", []),
+            "definitions": briefing.get("definitions", []),
+            "citations": citations,
+            "created_at": now,
+            "updated_at": now,
+        }
+        save_interaction_cosmos(briefing_interaction)
 
-    return {
-        "document": doc_meta,
-        "briefing": briefing_interaction
-    }
+        # 4. Promote to 'ready' only after child persistence succeeds
+        doc_meta["status"] = "ready"
+        doc_meta["updated_at"] = time.time()
+        save_document_cosmos(doc_meta)
+
+        return {
+            "document": doc_meta,
+            "briefing": briefing_interaction
+        }
+    except Exception as e:
+        doc_meta["status"] = "failed"
+        doc_meta["error"] = str(e)
+        doc_meta["updated_at"] = time.time()
+        try:
+            save_document_cosmos(doc_meta)
+            delete_document_pages_cosmos(doc_id)
+            delete_interactions_cosmos(doc_id)
+        except Exception:
+            pass
+        raise e
 
 def clone_document_content(
     source_doc_id: str,
@@ -204,36 +221,7 @@ def clone_document_content(
     if not source_doc:
         raise ValueError(f"Source document {source_doc_id} not found for cloning.")
 
-    # 1. Fetch source pages and save under new target_doc_id
-    source_pages = get_document_pages_cosmos(source_doc_id)
-    pages_to_save = [
-        {"page": p["page"], "text": p.get("text", "")}
-        for p in source_pages
-    ]
-    if pages_to_save:
-        save_document_pages_cosmos(target_doc_id, pages_to_save)
-
-    # 2. Fetch source briefing and create independent briefing interaction for target_doc_id
-    source_interactions = get_document_interactions(source_doc_id)
-    briefing_int = next((i for i in source_interactions if i.get("type") == "briefing"), None)
-
-    target_briefing = {
-        "id": f"int_{target_doc_id}_briefing",
-        "document_id": target_doc_id,
-        "type": "briefing",
-        "status": "completed",
-        "user_query": None,
-        "ai_response_text": briefing_int.get("ai_response_text", "") if briefing_int else "",
-        "overview": briefing_int.get("overview", "") if briefing_int else "",
-        "key_takeaways": briefing_int.get("key_takeaways", []) if briefing_int else [],
-        "definitions": briefing_int.get("definitions", []) if briefing_int else [],
-        "citations": briefing_int.get("citations", []) if briefing_int else [],
-        "created_at": now,
-        "updated_at": now,
-    }
-    save_interaction_cosmos(target_briefing)
-
-    # 3. Create document metadata with the new target_doc_id
+    # 1. Initialize target document in 'processing' status
     target_doc = {
         "id": target_doc_id,
         "name": filename or source_doc.get("name", "Document"),
@@ -241,17 +229,64 @@ def clone_document_content(
         "file_hash": file_hash,
         "blob_url": source_doc.get("blob_url"),
         "size": file_size if file_size is not None else source_doc.get("size"),
-        "page_count": source_doc.get("page_count", len(source_pages)),
-        "status": "ready",
+        "page_count": source_doc.get("page_count", 1),
+        "status": "processing",
         "created_at": now,
         "updated_at": now,
     }
     save_document_cosmos(target_doc)
 
-    return {
-        "document": target_doc,
-        "briefing": target_briefing
-    }
+    try:
+        # 2. Fetch source pages and save under new target_doc_id
+        source_pages = get_document_pages_cosmos(source_doc_id)
+        pages_to_save = [
+            {"page": p["page"], "text": p.get("text", "")}
+            for p in source_pages
+        ]
+        if pages_to_save:
+            save_document_pages_cosmos(target_doc_id, pages_to_save)
+
+        # 3. Fetch source briefing and create independent briefing interaction for target_doc_id
+        source_interactions = get_document_interactions(source_doc_id)
+        briefing_int = next((i for i in source_interactions if i.get("type") == "briefing"), None)
+
+        target_briefing = {
+            "id": f"int_{target_doc_id}_briefing",
+            "document_id": target_doc_id,
+            "type": "briefing",
+            "status": "completed",
+            "user_query": None,
+            "ai_response_text": briefing_int.get("ai_response_text", "") if briefing_int else "",
+            "overview": briefing_int.get("overview", "") if briefing_int else "",
+            "key_takeaways": briefing_int.get("key_takeaways", []) if briefing_int else [],
+            "definitions": briefing_int.get("definitions", []) if briefing_int else [],
+            "citations": briefing_int.get("citations", []) if briefing_int else [],
+            "created_at": now,
+            "updated_at": now,
+        }
+        save_interaction_cosmos(target_briefing)
+
+        # 4. Promote to 'ready'
+        target_doc["page_count"] = len(source_pages) if source_pages else target_doc["page_count"]
+        target_doc["status"] = "ready"
+        target_doc["updated_at"] = time.time()
+        save_document_cosmos(target_doc)
+
+        return {
+            "document": target_doc,
+            "briefing": target_briefing
+        }
+    except Exception as e:
+        target_doc["status"] = "failed"
+        target_doc["error"] = str(e)
+        target_doc["updated_at"] = time.time()
+        try:
+            save_document_cosmos(target_doc)
+            delete_document_pages_cosmos(target_doc_id)
+            delete_interactions_cosmos(target_doc_id)
+        except Exception:
+            pass
+        raise e
 
 def get_document(doc_id: str) -> dict | None:
     """Fetches document metadata from documents container."""

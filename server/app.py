@@ -91,11 +91,11 @@ def upload_pdf():
         filename = uploaded_file.filename
 
         # 3. Upload content-addressed blob to Azure Blob Storage
-        blob_url = None
         try:
             blob_url = upload_document_blob(file_hash, file_bytes, filename)
         except Exception as storage_err:
-            app.logger.warning(f"Azure Blob upload warning: {storage_err}")
+            app.logger.error(f"Azure Blob upload failed: {storage_err}")
+            return jsonify({"error": f"Failed to upload document to storage: {str(storage_err)}"}), 500
 
         # 4. Generate proactive spoken briefing via Azure AI Foundry
         briefing = generate_document_briefing(filename, full_text)
