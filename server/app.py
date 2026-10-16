@@ -255,13 +255,21 @@ def get_download_url(doc_id: str):
 
 @app.route("/api/documents/<doc_id>", methods=["DELETE"])
 def remove_document(doc_id: str):
-    deleted = delete_document(doc_id)
-    if not deleted:
+    result = delete_document(doc_id)
+    if not result["document_deleted"] and result["pages_deleted"] == 0 and result["interactions_deleted"] == 0:
         return jsonify({"error": "Document not found"}), 404
+
+    if not result["success"]:
+        return jsonify({
+            "success": False,
+            "message": "Partial deletion occurred. Please retry.",
+            "details": result
+        }), 500
 
     return jsonify({
         "success": True,
-        "deleted_id": doc_id
+        "deleted_id": doc_id,
+        "details": result
     })
 
 @app.route("/api/chat", methods=["POST"])

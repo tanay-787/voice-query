@@ -308,24 +308,57 @@ def get_document_by_hash(file_hash: str) -> dict | None:
     """Performs an indexed lookup in Cosmos DB by SHA-256 hash."""
     return get_document_by_hash_cosmos(file_hash)
 
-def delete_document(doc_id: str) -> bool:
+def delete_document(doc_id: str) -> dict:
     """
-    Deletes document metadata, pages, and interactions from Cosmos DB.
-    Only purges the blob from storage if no other document references this file hash.
+    Deletes document metadata, pages, and interactions from Cosmos DB,
+    and purges associated storage blob if not referenced by other documents.
+    Returns a comprehensive result dictionary tracking each cleanup operation.
     """
+    errors = []
     doc = get_document_cosmos(doc_id)
     file_hash = doc.get("file_hash") if doc else None
 
-    deleted_db = delete_document_cosmos(doc_id)
-    delete_document_pages_cosmos(doc_id)
-    delete_interactions_cosmos(doc_id)
+    doc_deleted = False
+    try:
+        doc_deleted = delete_document_cosmos(doc_id)
+    except Exception as e:
+        errors.append(f"document: {str(e)}")
 
-    # If this was the last document referencing this file hash, purge blob
+    pages_deleted = 0
+    try:
+        pages_deleted = delete_document_pages_cosmos(doc_id)
+    except Exception as e:
+        errors.append(f"pages: {str(e)}")
+
+    interactions_deleted = 0
+    try:
+        interactions_deleted = delete_interactions_cosmos(doc_id)
+    except Exception as e:
+        errors.append(f"interactions: {str(e)}")
+
+    blob_deleted = False
     if file_hash:
-        remaining_count = count_documents_by_hash_cosmos(file_hash)
-        if remaining_count == 0:
-            delete_document_blob(file_hash)
-    # Also delete doc_id blob if legacy naming was used
-    delete_document_blob(doc_id)
+        try:
+            remaining_count = count_documents_by_hash_cosmos(file_hash)
+            if remaining_count == 0:
+                blob_deleted = delete_document_blob(file_hash)
+        except Exception as e:
+            errors.append(f"blob: {str(e)}")
 
-    return deleted_db
+    # Legacy fallback blob check
+    try:
+        delete_document_blob(doc_id)
+    except Exception:
+        pass
+
+    found_and_cleaned = doc_deleted or pages_deleted > 0 or interactions_deleted > 0
+
+    return {
+        "success": found_and_cleaned and len(errors) == 0,
+        "deleted_id": doc_id,
+        "document_deleted": doc_deleted,
+        "pages_deleted": pages_deleted,
+        "interactions_deleted": interactions_deleted,
+        "blob_deleted": blob_deleted,
+        "errors": errors
+    }
