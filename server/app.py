@@ -9,6 +9,7 @@ from document_engine import (
     extract_url_content,
     generate_document_briefing,
     save_document_and_pages,
+    clone_document_content,
     get_document,
     get_document_pages,
     get_document_interactions,
@@ -56,15 +57,31 @@ def upload_pdf():
         file_hash = calculate_sha256(file_bytes)
         existing = get_document_by_hash(file_hash)
         if existing:
-            # Document with this exact content already exists
-            existing_interactions = get_document_interactions(existing["id"])
-            briefing = next((i for i in existing_interactions if i.get("type") == "briefing"), None)
-            return jsonify({
-                "success": True,
-                "deduplicated": True,
-                "document": existing,
-                "briefing": briefing
-            })
+            if existing["id"] == doc_id:
+                # Same exact document session re-uploaded / retried
+                existing_interactions = get_document_interactions(existing["id"])
+                briefing = next((i for i in existing_interactions if i.get("type") == "briefing"), None)
+                return jsonify({
+                    "success": True,
+                    "deduplicated": True,
+                    "document": existing,
+                    "briefing": briefing
+                })
+            else:
+                # Content duplicate! Fast-clone pages & briefing under client's canonical ID
+                cloned = clone_document_content(
+                    source_doc_id=existing["id"],
+                    target_doc_id=doc_id,
+                    filename=uploaded_file.filename,
+                    file_hash=file_hash,
+                    file_size=len(file_bytes),
+                )
+                return jsonify({
+                    "success": True,
+                    "deduplicated": True,
+                    "document": cloned["document"],
+                    "briefing": cloned["briefing"]
+                })
 
         # 2. Extract pages and text
         full_text, pages, page_count = extract_pdf_pages(file_bytes)
@@ -73,10 +90,10 @@ def upload_pdf():
 
         filename = uploaded_file.filename
 
-        # 3. Upload to Azure Blob Storage
+        # 3. Upload content-addressed blob to Azure Blob Storage
         blob_url = None
         try:
-            blob_url = upload_document_blob(doc_id, file_bytes, filename)
+            blob_url = upload_document_blob(file_hash, file_bytes, filename)
         except Exception as storage_err:
             app.logger.warning(f"Azure Blob upload warning: {storage_err}")
 
@@ -134,14 +151,29 @@ def ingest_url():
         # Check deduplication
         existing = get_document_by_hash(file_hash)
         if existing:
-            existing_interactions = get_document_interactions(existing["id"])
-            briefing = next((i for i in existing_interactions if i.get("type") == "briefing"), None)
-            return jsonify({
-                "success": True,
-                "deduplicated": True,
-                "document": existing,
-                "briefing": briefing
-            })
+            if existing["id"] == doc_id:
+                existing_interactions = get_document_interactions(existing["id"])
+                briefing = next((i for i in existing_interactions if i.get("type") == "briefing"), None)
+                return jsonify({
+                    "success": True,
+                    "deduplicated": True,
+                    "document": existing,
+                    "briefing": briefing
+                })
+            else:
+                cloned = clone_document_content(
+                    source_doc_id=existing["id"],
+                    target_doc_id=doc_id,
+                    filename=title,
+                    file_hash=file_hash,
+                    file_size=len(full_text.encode("utf-8")),
+                )
+                return jsonify({
+                    "success": True,
+                    "deduplicated": True,
+                    "document": cloned["document"],
+                    "briefing": cloned["briefing"]
+                })
 
         # Generate proactive briefing
         briefing = generate_document_briefing(title, full_text)
@@ -159,6 +191,7 @@ def ingest_url():
 
         return jsonify({
             "success": True,
+            "deduplicated": False,
             "document": saved["document"],
             "briefing": saved["briefing"]
         })
@@ -210,7 +243,8 @@ def get_download_url(doc_id: str):
         return jsonify({"error": "Document not found"}), 404
 
     try:
-        sas_url = generate_sas_url(doc_id, expiry_hours=24)
+        blob_identifier = doc.get("file_hash") or doc_id
+        sas_url = generate_sas_url(blob_identifier, expiry_hours=24)
         return jsonify({"download_url": sas_url})
     except Exception as e:
         return jsonify({"error": f"Could not generate SAS download URL: {str(e)}"}), 500

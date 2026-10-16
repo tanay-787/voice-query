@@ -103,6 +103,24 @@ def get_document_by_hash_cosmos(file_hash: str) -> dict | None:
     ))
     return items[0] if items else None
 
+def count_documents_by_hash_cosmos(file_hash: str) -> int:
+    """
+    Counts how many document sessions currently reference this file hash.
+    """
+    container = get_documents_container()
+    if container is None:
+        return 0
+
+    query = "SELECT VALUE COUNT(1) FROM c WHERE c.file_hash = @file_hash"
+    params = [{"name": "@file_hash", "value": file_hash}]
+
+    items = list(container.query_items(
+        query=query,
+        parameters=params,
+        enable_cross_partition_query=True
+    ))
+    return items[0] if items else 0
+
 def delete_document_cosmos(doc_id: str) -> bool:
     """
     Deletes a document from the documents container.

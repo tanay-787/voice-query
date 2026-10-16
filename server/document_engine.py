@@ -14,6 +14,7 @@ from cosmos_db import (
     save_document_cosmos,
     get_document_cosmos,
     get_document_by_hash_cosmos,
+    count_documents_by_hash_cosmos,
     delete_document_cosmos,
     save_document_pages_cosmos,
     get_document_pages_cosmos,
@@ -186,6 +187,72 @@ def save_document_and_pages(
         "briefing": briefing_interaction
     }
 
+def clone_document_content(
+    source_doc_id: str,
+    target_doc_id: str,
+    filename: str,
+    file_hash: str,
+    file_size: int | None = None,
+) -> dict:
+    """
+    Instantly clones extracted pages and executive briefing from an existing document
+    to a new client canonical document ID without re-parsing PDF or re-generating LLM tokens.
+    Guarantees the client preserves its requested ID with zero duplicate compute.
+    """
+    now = time.time()
+    source_doc = get_document_cosmos(source_doc_id)
+    if not source_doc:
+        raise ValueError(f"Source document {source_doc_id} not found for cloning.")
+
+    # 1. Fetch source pages and save under new target_doc_id
+    source_pages = get_document_pages_cosmos(source_doc_id)
+    pages_to_save = [
+        {"page": p["page"], "text": p.get("text", "")}
+        for p in source_pages
+    ]
+    if pages_to_save:
+        save_document_pages_cosmos(target_doc_id, pages_to_save)
+
+    # 2. Fetch source briefing and create independent briefing interaction for target_doc_id
+    source_interactions = get_document_interactions(source_doc_id)
+    briefing_int = next((i for i in source_interactions if i.get("type") == "briefing"), None)
+
+    target_briefing = {
+        "id": f"int_{target_doc_id}_briefing",
+        "document_id": target_doc_id,
+        "type": "briefing",
+        "status": "completed",
+        "user_query": None,
+        "ai_response_text": briefing_int.get("ai_response_text", "") if briefing_int else "",
+        "overview": briefing_int.get("overview", "") if briefing_int else "",
+        "key_takeaways": briefing_int.get("key_takeaways", []) if briefing_int else [],
+        "definitions": briefing_int.get("definitions", []) if briefing_int else [],
+        "citations": briefing_int.get("citations", []) if briefing_int else [],
+        "created_at": now,
+        "updated_at": now,
+    }
+    save_interaction_cosmos(target_briefing)
+
+    # 3. Create document metadata with the new target_doc_id
+    target_doc = {
+        "id": target_doc_id,
+        "name": filename or source_doc.get("name", "Document"),
+        "source_type": source_doc.get("source_type", "pdf"),
+        "file_hash": file_hash,
+        "blob_url": source_doc.get("blob_url"),
+        "size": file_size if file_size is not None else source_doc.get("size"),
+        "page_count": source_doc.get("page_count", len(source_pages)),
+        "status": "ready",
+        "created_at": now,
+        "updated_at": now,
+    }
+    save_document_cosmos(target_doc)
+
+    return {
+        "document": target_doc,
+        "briefing": target_briefing
+    }
+
 def get_document(doc_id: str) -> dict | None:
     """Fetches document metadata from documents container."""
     return get_document_cosmos(doc_id)
@@ -208,11 +275,22 @@ def get_document_by_hash(file_hash: str) -> dict | None:
 
 def delete_document(doc_id: str) -> bool:
     """
-    Deletes document metadata, pages, and interactions from Cosmos DB,
-    and purges the raw PDF from Azure Blob Storage.
+    Deletes document metadata, pages, and interactions from Cosmos DB.
+    Only purges the blob from storage if no other document references this file hash.
     """
+    doc = get_document_cosmos(doc_id)
+    file_hash = doc.get("file_hash") if doc else None
+
     deleted_db = delete_document_cosmos(doc_id)
     delete_document_pages_cosmos(doc_id)
     delete_interactions_cosmos(doc_id)
-    deleted_blob = delete_document_blob(doc_id)
-    return deleted_db or deleted_blob
+
+    # If this was the last document referencing this file hash, purge blob
+    if file_hash:
+        remaining_count = count_documents_by_hash_cosmos(file_hash)
+        if remaining_count == 0:
+            delete_document_blob(file_hash)
+    # Also delete doc_id blob if legacy naming was used
+    delete_document_blob(doc_id)
+
+    return deleted_db
