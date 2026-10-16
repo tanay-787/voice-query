@@ -16,5 +16,5 @@ COPY . .
 
 EXPOSE 5000
 
-# Run with Gunicorn, 2 workers with threads for SSE streaming
-CMD exec gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120 app:app
+# Run with Uvicorn ASGI server
+CMD exec uvicorn app:app --host 0.0.0.0 --port $PORT --workers 2

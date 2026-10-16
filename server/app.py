@@ -1,8 +1,14 @@
 import time
 import uuid
+import json
 import hashlib
-from flask import Flask, request, jsonify, Response
-from flask_cors import CORS
+from typing import Optional, List, Dict, Any
+
+from fastapi import FastAPI, UploadFile, File, Form, Query, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse, JSONResponse
+from pydantic import BaseModel
+
 from config import PORT, DEBUG
 from document_engine import (
     extract_pdf_pages,
@@ -20,89 +26,136 @@ from document_engine import (
 from storage import upload_document_blob, generate_sas_url
 from dialogue_engine import stream_speech_answer
 
-app = Flask(__name__)
-CORS(app)
+app = FastAPI(
+    title="VoiceQuery Intelligence Backend",
+    description="Spoken Document Intelligence API powered by Azure AI Foundry, Cosmos DB, and Blob Storage.",
+    version="1.0.0"
+)
 
-@app.route("/api/health", methods=["GET"])
+# Enable CORS for mobile client access
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ==========================================
+# Pydantic Request Models
+# ==========================================
+
+class ChatContext(BaseModel):
+    current_page: Optional[int] = 1
+
+class ChatRequest(BaseModel):
+    document_id: Optional[str] = None
+    doc_id: Optional[str] = None
+    question: Optional[str] = None
+    query: Optional[str] = None
+    conversation_history: Optional[List[Dict[str, Any]]] = []
+    context: Optional[ChatContext] = None
+    interaction_id: Optional[str] = None
+
+class UrlIngestRequest(BaseModel):
+    url: str
+    id: Optional[str] = None
+    client_doc_id: Optional[str] = None
+
+# ==========================================
+# Endpoints
+# ==========================================
+
+@app.get("/api/health")
 def health():
-    return jsonify({
+    return {
         "status": "healthy",
-        "service": "VoiceQuery Intelligence Backend",
+        "service": "VoiceQuery Intelligence Backend (FastAPI)",
         "model": "gpt-4-1-mini",
         "provider": "Azure AI Foundry",
         "storage": "Azure Blob Storage (voicequerystorage)",
         "database": "Azure Cosmos DB (voicequery-db / voicequery)",
         "containers": ["documents", "document_pages", "interactions"]
-    })
+    }
 
-@app.route("/api/documents/upload", methods=["POST"])
-def upload_pdf():
-    if "file" not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
-
-    uploaded_file = request.files["file"]
-    if not uploaded_file.filename or not uploaded_file.filename.lower().endswith(".pdf"):
-        return jsonify({"error": "Only PDF files are supported"}), 400
+@app.post("/api/documents/upload")
+async def upload_pdf(
+    file: UploadFile = File(...),
+    id: Optional[str] = Form(None),
+    client_doc_id: Optional[str] = Form(None)
+):
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only PDF files are supported"
+        )
 
     # Client-generated canonical ID (e.g. doc_1728... or client_doc_id)
-    client_id = request.form.get("id") or request.form.get("client_doc_id")
-    doc_id = client_id or f"doc_{int(time.time() * 1000)}_{uuid.uuid4().hex[:6]}"
+    canonical_id = id or client_doc_id or f"doc_{int(time.time() * 1000)}_{uuid.uuid4().hex[:6]}"
 
     try:
-        file_bytes = uploaded_file.read()
+        file_bytes = await file.read()
         if not file_bytes:
-            return jsonify({"error": "Uploaded file is empty"}), 400
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Uploaded file is empty"
+            )
 
         # 1. Compute SHA-256 checksum for instant deduplication
         file_hash = calculate_sha256(file_bytes)
         existing = get_document_by_hash(file_hash)
         if existing:
-            if existing["id"] == doc_id:
+            if existing["id"] == canonical_id:
                 # Same exact document session re-uploaded / retried
                 existing_interactions = get_document_interactions(existing["id"])
                 briefing = next((i for i in existing_interactions if i.get("type") == "briefing"), None)
-                return jsonify({
+                return {
                     "success": True,
                     "deduplicated": True,
                     "document": existing,
                     "briefing": briefing
-                })
+                }
             else:
                 # Content duplicate! Fast-clone pages & briefing under client's canonical ID
                 cloned = clone_document_content(
                     source_doc_id=existing["id"],
-                    target_doc_id=doc_id,
-                    filename=uploaded_file.filename,
+                    target_doc_id=canonical_id,
+                    filename=file.filename,
                     file_hash=file_hash,
                     file_size=len(file_bytes),
                 )
-                return jsonify({
+                return {
                     "success": True,
                     "deduplicated": True,
                     "document": cloned["document"],
                     "briefing": cloned["briefing"]
-                })
+                }
 
         # 2. Extract pages and text
         full_text, pages, page_count = extract_pdf_pages(file_bytes)
         if not full_text.strip():
-            return jsonify({"error": "Could not extract readable text from PDF"}), 400
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Could not extract readable text from PDF"
+            )
 
-        filename = uploaded_file.filename
+        filename = file.filename
 
-        # 3. Upload content-addressed blob to Azure Blob Storage
+        # 3. Upload content-addressed blob to Azure Blob Storage (fatal on failure)
         try:
             blob_url = upload_document_blob(file_hash, file_bytes, filename)
         except Exception as storage_err:
-            app.logger.error(f"Azure Blob upload failed: {storage_err}")
-            return jsonify({"error": f"Failed to upload document to storage: {str(storage_err)}"}), 500
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to upload document to storage: {str(storage_err)}"
+            )
 
         # 4. Generate proactive spoken briefing via Azure AI Foundry
         briefing = generate_document_briefing(filename, full_text)
 
         # 5. Persist document metadata, pages, and briefing interaction to Cosmos DB
         saved = save_document_and_pages(
-            doc_id=doc_id,
+            doc_id=canonical_id,
             title=briefing.get("title", filename),
             source_type="pdf",
             page_count=page_count,
@@ -113,37 +166,44 @@ def upload_pdf():
             file_size=len(file_bytes),
         )
 
-        return jsonify({
+        return {
             "success": True,
             "deduplicated": False,
             "document": saved["document"],
             "briefing": saved["briefing"]
-        })
+        }
 
+    except HTTPException:
+        raise
     except Exception as e:
-        app.logger.error(f"PDF upload failed: {e}")
-        return jsonify({"error": f"Failed to process PDF: {str(e)}"}), 500
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to process PDF: {str(e)}"
+        )
 
-@app.route("/api/documents/url", methods=["POST"])
-def ingest_url():
-    data = request.get_json() or {}
-    raw_url = data.get("url", "").strip()
-
+@app.post("/api/documents/url")
+def ingest_url(req: UrlIngestRequest):
+    raw_url = req.url.strip()
     if not raw_url:
-        return jsonify({"error": "URL is required"}), 400
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="URL is required"
+        )
 
     if not raw_url.startswith("http://") and not raw_url.startswith("https://"):
         url = f"https://{raw_url}"
     else:
         url = raw_url
 
-    client_id = data.get("id") or data.get("client_doc_id")
-    doc_id = client_id or f"doc_{int(time.time() * 1000)}_{uuid.uuid4().hex[:6]}"
+    canonical_id = req.id or req.client_doc_id or f"doc_{int(time.time() * 1000)}_{uuid.uuid4().hex[:6]}"
 
     try:
         full_text, title = extract_url_content(url)
         if not full_text.strip():
-            return jsonify({"error": "Could not extract readable text from URL"}), 400
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Could not extract readable text from URL"
+            )
 
         pages = [{"page": 1, "text": full_text}]
         file_hash = hashlib.sha256(full_text.encode("utf-8")).hexdigest()
@@ -151,36 +211,36 @@ def ingest_url():
         # Check deduplication
         existing = get_document_by_hash(file_hash)
         if existing:
-            if existing["id"] == doc_id:
+            if existing["id"] == canonical_id:
                 existing_interactions = get_document_interactions(existing["id"])
                 briefing = next((i for i in existing_interactions if i.get("type") == "briefing"), None)
-                return jsonify({
+                return {
                     "success": True,
                     "deduplicated": True,
                     "document": existing,
                     "briefing": briefing
-                })
+                }
             else:
                 cloned = clone_document_content(
                     source_doc_id=existing["id"],
-                    target_doc_id=doc_id,
+                    target_doc_id=canonical_id,
                     filename=title,
                     file_hash=file_hash,
                     file_size=len(full_text.encode("utf-8")),
                 )
-                return jsonify({
+                return {
                     "success": True,
                     "deduplicated": True,
                     "document": cloned["document"],
                     "briefing": cloned["briefing"]
-                })
+                }
 
         # Generate proactive briefing
         briefing = generate_document_briefing(title, full_text)
 
         # Save to Cosmos DB
         saved = save_document_and_pages(
-            doc_id=doc_id,
+            doc_id=canonical_id,
             title=briefing.get("title", title),
             source_type="url",
             page_count=1,
@@ -189,105 +249,137 @@ def ingest_url():
             file_hash=file_hash,
         )
 
-        return jsonify({
+        return {
             "success": True,
             "deduplicated": False,
             "document": saved["document"],
             "briefing": saved["briefing"]
-        })
+        }
 
+    except HTTPException:
+        raise
     except Exception as e:
-        app.logger.error(f"URL ingestion failed: {e}")
-        return jsonify({"error": f"Failed to process URL: {str(e)}"}), 500
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to process URL: {str(e)}"
+        )
 
-@app.route("/api/documents/<doc_id>", methods=["GET"])
+@app.get("/api/documents/{doc_id}")
 def fetch_document(doc_id: str):
     doc = get_document(doc_id)
     if not doc:
-        return jsonify({"error": "Document not found"}), 404
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+    return doc
 
-    return jsonify(doc)
-
-@app.route("/api/documents/<doc_id>/interactions", methods=["GET"])
+@app.get("/api/documents/{doc_id}/interactions")
 def fetch_document_interactions(doc_id: str):
     doc = get_document(doc_id)
     if not doc:
-        return jsonify({"error": "Document not found"}), 404
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
 
     interactions = get_document_interactions(doc_id)
-    return jsonify({
+    return {
         "document_id": doc_id,
         "interactions": interactions
-    })
+    }
 
-@app.route("/api/documents/<doc_id>/pages", methods=["GET"])
-def fetch_document_pages(doc_id: str):
+@app.get("/api/documents/{doc_id}/pages")
+def fetch_document_pages(
+    doc_id: str,
+    start_page: Optional[int] = Query(None),
+    end_page: Optional[int] = Query(None)
+):
     doc = get_document(doc_id)
     if not doc:
-        return jsonify({"error": "Document not found"}), 404
-
-    start_page = request.args.get("start_page", type=int)
-    end_page = request.args.get("end_page", type=int)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
 
     pages = get_document_pages(doc_id, start_page, end_page)
-    return jsonify({
+    return {
         "document_id": doc_id,
         "count": len(pages),
         "pages": pages
-    })
+    }
 
-@app.route("/api/documents/<doc_id>/download-url", methods=["GET"])
+@app.get("/api/documents/{doc_id}/download-url")
 def get_download_url(doc_id: str):
     doc = get_document(doc_id)
     if not doc:
-        return jsonify({"error": "Document not found"}), 404
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
 
     # Verify downloadable PDF exists in Blob Storage
     if not doc.get("blob_url") or doc.get("source_type") != "pdf":
-        return jsonify({"error": "No downloadable PDF file exists for this document"}), 404
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No downloadable PDF file exists for this document"
+        )
 
     try:
         blob_identifier = doc.get("file_hash") or doc_id
         sas_url = generate_sas_url(blob_identifier, expiry_hours=24)
-        return jsonify({"download_url": sas_url})
+        return {"download_url": sas_url}
     except Exception as e:
-        return jsonify({"error": f"Could not generate SAS download URL: {str(e)}"}), 500
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Could not generate SAS download URL: {str(e)}"
+        )
 
-@app.route("/api/documents/<doc_id>", methods=["DELETE"])
+@app.delete("/api/documents/{doc_id}")
 def remove_document(doc_id: str):
     result = delete_document(doc_id)
     if not result["document_deleted"] and result["pages_deleted"] == 0 and result["interactions_deleted"] == 0:
-        return jsonify({"error": "Document not found"}), 404
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
 
     if not result["success"]:
-        return jsonify({
-            "success": False,
-            "message": "Partial deletion occurred. Please retry.",
-            "details": result
-        }), 500
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "success": False,
+                "message": "Partial deletion occurred. Please retry.",
+                "details": result
+            }
+        )
 
-    return jsonify({
+    return {
         "success": True,
         "deleted_id": doc_id,
         "details": result
-    })
+    }
 
-@app.route("/api/chat", methods=["POST"])
-def chat_sync():
-    data = request.get_json() or {}
-    doc_id = data.get("document_id") or data.get("doc_id")
-    question = (data.get("question") or data.get("query", "")).strip()
-    conversation_history = data.get("conversation_history", [])
-    context = data.get("context", {})
-    current_page = context.get("current_page")
-    interaction_id = data.get("interaction_id")
+@app.post("/api/chat")
+def chat_sync(req: ChatRequest):
+    doc_id = req.document_id or req.doc_id
+    question = (req.question or req.query or "").strip()
+    conversation_history = req.conversation_history or []
+    current_page = req.context.current_page if req.context else 1
+    interaction_id = req.interaction_id
 
     if not doc_id or not question:
-        return jsonify({"error": "document_id and question are required"}), 400
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="document_id and question are required"
+        )
 
     doc = get_document(doc_id)
     if not doc:
-        return jsonify({"error": "Document not found"}), 404
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
 
     page = current_page or 1
     answer = ""
@@ -304,7 +396,6 @@ def chat_sync():
             data_str = lines[1].replace("data: ", "").strip()
             if event_name == "citation":
                 try:
-                    import json
                     citation_data = json.loads(data_str)
                     if isinstance(citation_data, dict):
                         page = citation_data.get("page", page)
@@ -312,39 +403,45 @@ def chat_sync():
                     pass
             elif event_name == "done":
                 try:
-                    import json
                     done_data = json.loads(data_str)
                     answer = done_data.get("answer", "")
                     page = done_data.get("citation", {}).get("page", page)
                 except Exception:
                     pass
 
-    return jsonify({
+    return {
         "answer": answer,
         "citation": {"page": page}
-    })
+    }
 
-@app.route("/api/chat/stream", methods=["POST"])
-def chat_stream():
-    data = request.get_json() or {}
-    doc_id = data.get("document_id") or data.get("doc_id")
-    question = (data.get("question") or data.get("query", "")).strip()
-    conversation_history = data.get("conversation_history", [])
-    context = data.get("context", {})
-    current_page = context.get("current_page")
-    interaction_id = data.get("interaction_id")
+@app.post("/api/chat/stream")
+def chat_stream(req: ChatRequest):
+    doc_id = req.document_id or req.doc_id
+    question = (req.question or req.query or "").strip()
+    conversation_history = req.conversation_history or []
+    current_page = req.context.current_page if req.context else 1
+    interaction_id = req.interaction_id
 
     if not doc_id:
-        return jsonify({"error": "document_id is required"}), 400
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="document_id is required"
+        )
 
     if not question:
-        return jsonify({"error": "question is required"}), 400
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="question is required"
+        )
 
     doc = get_document(doc_id)
     if not doc:
-        return jsonify({"error": "Document not found"}), 404
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
 
-    return Response(
+    return StreamingResponse(
         stream_speech_answer(
             question=question,
             document=doc,
@@ -352,7 +449,7 @@ def chat_stream():
             current_page=current_page,
             interaction_id=interaction_id
         ),
-        mimetype="text/event-stream",
+        media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no"
@@ -360,4 +457,5 @@ def chat_stream():
     )
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=PORT, debug=DEBUG)
+    import uvicorn
+    uvicorn.run("app:app", host="0.0.0.0", port=PORT, reload=DEBUG)
