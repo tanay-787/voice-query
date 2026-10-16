@@ -242,6 +242,10 @@ def get_download_url(doc_id: str):
     if not doc:
         return jsonify({"error": "Document not found"}), 404
 
+    # Verify downloadable PDF exists in Blob Storage
+    if not doc.get("blob_url") or doc.get("source_type") != "pdf":
+        return jsonify({"error": "No downloadable PDF file exists for this document"}), 404
+
     try:
         blob_identifier = doc.get("file_hash") or doc_id
         sas_url = generate_sas_url(blob_identifier, expiry_hours=24)
@@ -292,8 +296,10 @@ def chat_sync():
             data_str = lines[1].replace("data: ", "").strip()
             if event_name == "citation":
                 try:
-                    citation_data = eval(data_str) if "{" in data_str else {}
-                    page = citation_data.get("page", page)
+                    import json
+                    citation_data = json.loads(data_str)
+                    if isinstance(citation_data, dict):
+                        page = citation_data.get("page", page)
                 except Exception:
                     pass
             elif event_name == "done":

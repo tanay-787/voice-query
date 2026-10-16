@@ -142,7 +142,8 @@ def stream_speech_answer(
             buffer += token
             page_match = re.search(r'\[PAGE:\s*(\d+)\]', buffer)
             if page_match:
-                cited_page = int(page_match.group(1))
+                raw_page = int(page_match.group(1))
+                cited_page = max(1, min(raw_page, page_count))
                 citation_sent = True
                 yield f"event: citation\ndata: {json.dumps({'page': cited_page})}\n\n"
                 clean_text = buffer[page_match.end():]
@@ -152,9 +153,10 @@ def stream_speech_answer(
                     yield f"event: token\ndata: {json.dumps({'token': clean_text})}\n\n"
                 continue
             elif len(buffer) > 25:
-                # No tag found early, fallback to active reading page
+                # No tag found early, fallback to active reading page clamped to range
+                cited_page = max(1, min(active_page, page_count))
                 citation_sent = True
-                yield f"event: citation\ndata: {json.dumps({'page': active_page})}\n\n"
+                yield f"event: citation\ndata: {json.dumps({'page': cited_page})}\n\n"
                 full_answer.append(buffer)
                 yield f"event: token\ndata: {json.dumps({'token': buffer})}\n\n"
                 buffer = ""
@@ -165,18 +167,19 @@ def stream_speech_answer(
     # Flush remaining buffer if tag was never triggered
     if buffer:
         if not citation_sent:
-            yield f"event: citation\ndata: {json.dumps({'page': active_page})}\n\n"
+            cited_page = max(1, min(active_page, page_count))
+            yield f"event: citation\ndata: {json.dumps({'page': cited_page})}\n\n"
         full_answer.append(buffer)
         yield f"event: token\ndata: {json.dumps({'token': buffer})}\n\n"
 
     complete_text = "".join(full_answer).strip()
-    yield f"event: done\ndata: {json.dumps({'answer': complete_text, 'citation': {'page': cited_page}})}\n\n"
 
-    # Persist the completed interaction turn into Cosmos DB interactions container
+    # Persist the completed interaction turn into Cosmos DB BEFORE signaling completion
+    saved_interaction_id = interaction_id or f"int_{int(time.time() * 1000)}_{uuid.uuid4().hex[:6]}"
     try:
         now = time.time()
         interaction_record = {
-            "id": interaction_id or f"int_{int(now * 1000)}_{uuid.uuid4().hex[:6]}",
+            "id": saved_interaction_id,
             "document_id": doc_id,
             "type": "qa",
             "status": "completed",
@@ -190,3 +193,6 @@ def stream_speech_answer(
         save_interaction_cosmos(interaction_record)
     except Exception as e:
         print(f"[DialogueEngine] Failed to save interaction: {e}")
+
+    # Yield completion event with persisted interaction ID
+    yield f"event: done\ndata: {json.dumps({'answer': complete_text, 'citation': {'page': cited_page}, 'interaction_id': saved_interaction_id})}\n\n"
