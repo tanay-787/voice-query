@@ -1,2 +1,17 @@
-#!/data/data/com.termux/files/usr/bin/sh
-npx --no -- commitlint --edit "$1"
+#!/bin/sh
+# Resolve Node runtime into PATH for non-interactive shells / git hooks
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+
+if command -v fnm >/dev/null 2>&1; then
+  eval "$(fnm env 2>/dev/null)"
+elif [ -d "$HOME/.config/nvm" ]; then
+  export NVM_DIR="$HOME/.config/nvm"
+  node_bin=$(ls -d "$NVM_DIR/versions/node/"* 2>/dev/null | sort -V | tail -1)/bin
+  export PATH="$node_bin:$PATH"
+elif [ -d "$HOME/.nvm" ]; then
+  export NVM_DIR="$HOME/.nvm"
+  node_bin=$(ls -d "$NVM_DIR/versions/node/"* 2>/dev/null | sort -V | tail -1)/bin
+  export PATH="$node_bin:$PATH"
+fi
+
+pnpm exec commitlint --edit "$1"
