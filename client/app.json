@@ -105,6 +105,14 @@
         {
           "enforceContrast": false
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "enableSceneSupport": true
+          }
+        }
       ]
     ],
     "androidStatusBar": {
