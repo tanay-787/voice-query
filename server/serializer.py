@@ -5,6 +5,7 @@ from pipecat.frames.frames import (
     Frame,
     InputAudioRawFrame,
     InputTransportMessageFrame,
+    InterruptionFrame,
     OutputAudioRawFrame,
     OutputTransportMessageFrame,
     TranscriptionFrame,
@@ -41,6 +42,10 @@ class VoiceQueryFrameSerializer(FrameSerializer):
             # 4. Standard out-of-band JSON transport messages
             elif isinstance(frame, OutputTransportMessageFrame):
                 return json.dumps(frame.message)
+
+            # 5. Interruption event -> notify mobile client to stop local audio playback immediately
+            elif isinstance(frame, InterruptionFrame):
+                return json.dumps({"type": "INTERRUPT"})
 
         except Exception as e:
             logger.error(f"[VoiceQuerySerializer] Serialization error: {e}")
