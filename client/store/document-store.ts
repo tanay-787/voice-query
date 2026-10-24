@@ -6,10 +6,12 @@ import {
   insertDocument,
   updateDocumentProgress as repoUpdateProgress,
   updateDocumentLastOpened,
+  updateDocumentSyncStatus,
   deleteDocumentRecord,
   getActiveDocId,
   setActiveDocId,
 } from "@/db/document-repository";
+import { uploadPdfDocument } from "@/services/api";
 
 export type { DocumentItem };
 
@@ -28,6 +30,7 @@ interface DocumentStore {
   // Actions
   initialize: () => Promise<void>;
   importDocument: (asset: ImportAssetInput) => Promise<DocumentItem>;
+  syncDocument: (id: string) => Promise<void>;
   selectDocument: (id: string) => void;
   updatePageProgress: (id: string, page: number, totalPages?: number) => void;
   deleteDocument: (id: string) => Promise<void>;
@@ -100,7 +103,7 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
         currentPage: 1,
         createdAt: now,
         lastOpenedAt: now,
-        syncStatus: "local",
+        syncStatus: "syncing",
       };
 
       // 3. Persist to SQLite
@@ -114,10 +117,60 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
         isImporting: false,
       }));
 
+      // 5. Asynchronously sync to backend in background (non-blocking)
+      get()
+        .syncDocument(newDoc.id)
+        .catch((err) => {
+          console.warn("[DocumentStore] Background sync failed:", err);
+        });
+
       return newDoc;
     } catch (error) {
       set({ isImporting: false });
       throw error;
+    }
+  },
+
+  syncDocument: async (id: string) => {
+    const doc = get().documents.find((d) => d.id === id);
+    if (!doc || doc.syncStatus === "synced") return;
+
+    set((state) => ({
+      documents: state.documents.map((d) =>
+        d.id === id ? { ...d, syncStatus: "syncing" } : d
+      ),
+    }));
+
+    try {
+      const response = await uploadPdfDocument(doc.uri, doc.id);
+      const serverDocId = response.document.id;
+      const serverPageCount = response.document.page_count;
+
+      await updateDocumentSyncStatus(id, "synced", serverDocId);
+      if (serverPageCount && serverPageCount > 0) {
+        await repoUpdateProgress(id, doc.currentPage, serverPageCount);
+      }
+
+      set((state) => ({
+        documents: state.documents.map((d) =>
+          d.id === id
+            ? {
+                ...d,
+                serverDocId,
+                pageCount: serverPageCount || d.pageCount,
+                syncStatus: "synced",
+              }
+            : d
+        ),
+      }));
+    } catch (error) {
+      console.warn(`[DocumentStore] Sync failed for doc ${id}:`, error);
+      await updateDocumentSyncStatus(id, "error");
+      set((state) => ({
+        documents: state.documents.map((d) =>
+          d.id === id ? { ...d, syncStatus: "error" } : d
+        ),
+      }));
     }
   },
 

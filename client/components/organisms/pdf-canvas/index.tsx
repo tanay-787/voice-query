@@ -16,6 +16,8 @@ import { Feather } from "@expo/vector-icons";
 import { useTheme } from "@/context/theme-context";
 import type { PdfCanvasProps, PdfCanvasRef } from "./types";
 
+export type { PdfCanvasProps, PdfCanvasRef };
+
 export const PdfCanvas = forwardRef<PdfCanvasRef, PdfCanvasProps>(
   (
     {

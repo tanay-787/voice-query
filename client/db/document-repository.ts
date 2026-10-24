@@ -102,6 +102,28 @@ export async function updateDocumentLastOpened(
   );
 }
 
+export async function updateDocumentSyncStatus(
+  id: string,
+  syncStatus: DocumentItem["syncStatus"],
+  serverDocId?: string
+): Promise<void> {
+  const db = await getDatabase();
+  if (serverDocId !== undefined) {
+    await db.runAsync(
+      "UPDATE documents SET sync_status = ?, server_doc_id = ? WHERE id = ?;",
+      syncStatus ?? "local",
+      serverDocId,
+      id
+    );
+  } else {
+    await db.runAsync(
+      "UPDATE documents SET sync_status = ? WHERE id = ?;",
+      syncStatus ?? "local",
+      id
+    );
+  }
+}
+
 export async function deleteDocumentRecord(id: string): Promise<void> {
   const db = await getDatabase();
   await db.runAsync("DELETE FROM documents WHERE id = ?;", id);

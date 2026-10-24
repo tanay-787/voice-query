@@ -1,5 +1,5 @@
-import React from "react";
-import { StyleSheet, Text, View, Pressable, Alert } from "react-native";
+import React, { useRef } from "react";
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useNavigation } from "expo-router";
@@ -8,7 +8,7 @@ import * as DocumentPicker from "expo-document-picker";
 import { Feather } from "@expo/vector-icons";
 import { RippleButton } from "@/components/primitives/ripple-button";
 import { EmptyCollectionState } from "@/components/blocks/empty-collection-v1";
-import { PdfCanvas } from "@/components/organisms/pdf-canvas";
+import { PdfCanvas, type PdfCanvasRef } from "@/components/organisms/pdf-canvas";
 import { useOnboarding } from "@/context/onboarding-context";
 import { useTheme } from "@/context/theme-context";
 import { useDocumentStore } from "@/store/document-store";
@@ -19,10 +19,13 @@ export default function DocumentCanvasScreen() {
   const { resetOnboarding } = useOnboarding();
   const { theme, isDark } = useTheme();
 
+  const pdfCanvasRef = useRef<PdfCanvasRef>(null);
+
   const documents = useDocumentStore((state) => state.documents);
   const activeDocId = useDocumentStore((state) => state.activeDocId);
   const initialize = useDocumentStore((state) => state.initialize);
   const importDocument = useDocumentStore((state) => state.importDocument);
+  const syncDocument = useDocumentStore((state) => state.syncDocument);
   const updatePageProgress = useDocumentStore((state) => state.updatePageProgress);
   const deleteDocument = useDocumentStore((state) => state.deleteDocument);
 
@@ -98,13 +101,38 @@ export default function DocumentCanvasScreen() {
 
         {activeDoc ? (
           <View style={styles.titleContainer}>
-            <Text
-              numberOfLines={1}
-              ellipsizeMode="middle"
-              style={[styles.docTitleText, { color: theme.textPrimary }]}
-            >
-              {activeDoc.name}
-            </Text>
+            <View style={styles.titleRow}>
+              <Text
+                numberOfLines={1}
+                ellipsizeMode="middle"
+                style={[styles.docTitleText, { color: theme.textPrimary }]}
+              >
+                {activeDoc.name}
+              </Text>
+              {activeDoc.syncStatus === "syncing" ? (
+                <ActivityIndicator
+                  size="small"
+                  color={theme.actionPrimary}
+                  style={styles.syncIndicator}
+                />
+              ) : activeDoc.syncStatus === "error" ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry syncing document to server"
+                  onPress={() => syncDocument(activeDoc.id)}
+                  style={styles.syncIndicator}
+                >
+                  <Feather name="cloud-off" size={13} color={theme.destructive} />
+                </Pressable>
+              ) : (
+                <Feather
+                  name="check-circle"
+                  size={12}
+                  color={theme.success}
+                  style={styles.syncIndicator}
+                />
+              )}
+            </View>
           </View>
         ) : null}
 
@@ -145,6 +173,7 @@ export default function DocumentCanvasScreen() {
       {activeDoc ? (
         <View style={styles.canvasContainer}>
           <PdfCanvas
+            ref={pdfCanvasRef}
             key={activeDoc.id}
             sourceUri={activeDoc.uri}
             initialPage={activeDoc.currentPage}
@@ -208,6 +237,15 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 8,
     alignItems: "center",
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  syncIndicator: {
+    padding: 2,
   },
   docTitleText: {
     fontSize: 13,
