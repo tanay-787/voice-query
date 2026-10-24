@@ -1,34 +1,36 @@
-import io
-import re
-import json
-import time
-import httpx
+import contextlib
 import hashlib
-from pypdf import PdfReader
-from azure.ai.inference import ChatCompletionsClient
+import io
+import json
+import re
+import time
+
+import httpx
 from azure.ai.inference.models import SystemMessage, UserMessage
-from azure.core.credentials import AzureKeyCredential
-from config import AZURE_AI_ENDPOINT, AZURE_AI_KEY, AZURE_AI_MODEL
-from storage import delete_document_blob
+from pypdf import PdfReader
+
+from config import AZURE_AI_MODEL
 from cosmos_db import (
-    save_document_cosmos,
-    get_document_cosmos,
-    get_document_by_hash_cosmos,
     count_documents_by_hash_cosmos,
     delete_document_cosmos,
-    save_document_pages_cosmos,
-    get_document_pages_cosmos,
     delete_document_pages_cosmos,
-    save_interaction_cosmos,
-    get_interactions_cosmos,
     delete_interactions_cosmos,
+    get_document_by_hash_cosmos,
+    get_document_cosmos,
+    get_document_pages_cosmos,
+    get_interactions_cosmos,
+    save_document_cosmos,
+    save_document_pages_cosmos,
+    save_interaction_cosmos,
 )
-
 from dialogue_engine import get_azure_client
+from storage import delete_document_blob
+
 
 def calculate_sha256(file_bytes: bytes) -> str:
     """Calculates SHA-256 hash of file bytes for content deduplication."""
     return hashlib.sha256(file_bytes).hexdigest()
+
 
 def extract_pdf_pages(file_bytes: bytes) -> tuple[str, list[dict], int]:
     """Extract page-by-page text from PDF file bytes."""
@@ -41,15 +43,13 @@ def extract_pdf_pages(file_bytes: bytes) -> tuple[str, list[dict], int]:
         page_num = i + 1
         text = page.extract_text() or ""
         # Clean excessive whitespace
-        cleaned = re.sub(r'[ \t]+', ' ', text).strip()
-        pages.append({
-            "page": page_num,
-            "text": cleaned
-        })
+        cleaned = re.sub(r"[ \t]+", " ", text).strip()
+        pages.append({"page": page_num, "text": cleaned})
         full_text_parts.append(f"--- [Page {page_num}] ---\n{cleaned}")
 
     full_text = "\n\n".join(full_text_parts)
     return full_text, pages, page_count
+
 
 def extract_url_content(url: str) -> tuple[str, str]:
     """Fetch and extract clean text from a web URL."""
@@ -62,15 +62,21 @@ def extract_url_content(url: str) -> tuple[str, str]:
         html = resp.text
 
     # Extract title
-    title_match = re.search(r'<title[^>]*>(.*?)</title>', html, re.IGNORECASE | re.DOTALL)
+    title_match = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
     title = title_match.group(1).strip() if title_match else "Web Page"
 
     # Clean scripts, styles, tags
-    cleaned = re.sub(r'<(script|style|nav|header|footer)[^>]*>.*?</\1>', ' ', html, flags=re.IGNORECASE | re.DOTALL)
-    cleaned = re.sub(r'<[^>]+>', ' ', cleaned)
-    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    cleaned = re.sub(
+        r"<(script|style|nav|header|footer)[^>]*>.*?</\1>",
+        " ",
+        html,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    cleaned = re.sub(r"<[^>]+>", " ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
 
     return cleaned[:50000], title
+
 
 BRIEFING_SYSTEM_PROMPT = """You are an Executive Document Intelligence Analyst.
 Analyze the provided document and produce a structured JSON response.
@@ -95,6 +101,7 @@ Respond strictly with valid JSON conforming to this schema:
 }
 """
 
+
 def generate_document_briefing(title_hint: str, document_text: str) -> dict:
     client = get_azure_client()
     preview = document_text[:40000]
@@ -102,22 +109,20 @@ def generate_document_briefing(title_hint: str, document_text: str) -> dict:
     prompt = f"Document Title Hint: {title_hint}\n\nDocument Content:\n{preview}"
 
     response = client.complete(
-        messages=[
-            SystemMessage(content=BRIEFING_SYSTEM_PROMPT),
-            UserMessage(content=prompt)
-        ],
+        messages=[SystemMessage(content=BRIEFING_SYSTEM_PROMPT), UserMessage(content=prompt)],
         model=AZURE_AI_MODEL,
-        temperature=0.3
+        temperature=0.3,
     )
 
     raw_json = response.choices[0].message.content
     try:
         return json.loads(raw_json)
-    except Exception as e:
-        match = re.search(r'\{.*\}', raw_json, re.DOTALL)
+    except Exception:
+        match = re.search(r"\{.*\}", raw_json, re.DOTALL)
         if match:
             return json.loads(match.group(0))
-        raise e
+        raise
+
 
 def save_document_and_pages(
     doc_id: str,
@@ -184,21 +189,17 @@ def save_document_and_pages(
         doc_meta["updated_at"] = time.time()
         save_document_cosmos(doc_meta)
 
-        return {
-            "document": doc_meta,
-            "briefing": briefing_interaction
-        }
+        return {"document": doc_meta, "briefing": briefing_interaction}
     except Exception as e:
         doc_meta["status"] = "failed"
         doc_meta["error"] = str(e)
         doc_meta["updated_at"] = time.time()
-        try:
+        with contextlib.suppress(Exception):
             save_document_cosmos(doc_meta)
             delete_document_pages_cosmos(doc_id)
             delete_interactions_cosmos(doc_id)
-        except Exception:
-            pass
-        raise e
+        raise
+
 
 def clone_document_content(
     source_doc_id: str,
@@ -235,10 +236,7 @@ def clone_document_content(
     try:
         # 2. Fetch source pages and save under new target_doc_id
         source_pages = get_document_pages_cosmos(source_doc_id)
-        pages_to_save = [
-            {"page": p["page"], "text": p.get("text", "")}
-            for p in source_pages
-        ]
+        pages_to_save = [{"page": p["page"], "text": p.get("text", "")} for p in source_pages]
         if pages_to_save:
             save_document_pages_cosmos(target_doc_id, pages_to_save)
 
@@ -268,41 +266,39 @@ def clone_document_content(
         target_doc["updated_at"] = time.time()
         save_document_cosmos(target_doc)
 
-        return {
-            "document": target_doc,
-            "briefing": target_briefing
-        }
+        return {"document": target_doc, "briefing": target_briefing}
     except Exception as e:
         target_doc["status"] = "failed"
         target_doc["error"] = str(e)
         target_doc["updated_at"] = time.time()
-        try:
+        with contextlib.suppress(Exception):
             save_document_cosmos(target_doc)
             delete_document_pages_cosmos(target_doc_id)
             delete_interactions_cosmos(target_doc_id)
-        except Exception:
-            pass
-        raise e
+        raise
+
 
 def get_document(doc_id: str) -> dict | None:
     """Fetches document metadata from documents container."""
     return get_document_cosmos(doc_id)
 
+
 def get_document_pages(
-    doc_id: str,
-    start_page: int | None = None,
-    end_page: int | None = None
+    doc_id: str, start_page: int | None = None, end_page: int | None = None
 ) -> list[dict]:
     """Fetches pages from document_pages container."""
     return get_document_pages_cosmos(doc_id, start_page, end_page)
+
 
 def get_document_interactions(doc_id: str) -> list[dict]:
     """Fetches all interactions for a document in chronological order."""
     return get_interactions_cosmos(doc_id)
 
+
 def get_document_by_hash(file_hash: str) -> dict | None:
     """Performs an indexed lookup in Cosmos DB by SHA-256 hash."""
     return get_document_by_hash_cosmos(file_hash)
+
 
 def delete_document(doc_id: str) -> dict:
     """
@@ -318,19 +314,19 @@ def delete_document(doc_id: str) -> dict:
     try:
         doc_deleted = delete_document_cosmos(doc_id)
     except Exception as e:
-        errors.append(f"document: {str(e)}")
+        errors.append(f"document: {e!s}")
 
     pages_deleted = 0
     try:
         pages_deleted = delete_document_pages_cosmos(doc_id)
     except Exception as e:
-        errors.append(f"pages: {str(e)}")
+        errors.append(f"pages: {e!s}")
 
     interactions_deleted = 0
     try:
         interactions_deleted = delete_interactions_cosmos(doc_id)
     except Exception as e:
-        errors.append(f"interactions: {str(e)}")
+        errors.append(f"interactions: {e!s}")
 
     blob_deleted = False
     if file_hash:
@@ -339,13 +335,11 @@ def delete_document(doc_id: str) -> dict:
             if remaining_count == 0:
                 blob_deleted = delete_document_blob(file_hash)
         except Exception as e:
-            errors.append(f"blob: {str(e)}")
+            errors.append(f"blob: {e!s}")
 
     # Legacy fallback blob check
-    try:
+    with contextlib.suppress(Exception):
         delete_document_blob(doc_id)
-    except Exception:
-        pass
 
     found_and_cleaned = doc_deleted or pages_deleted > 0 or interactions_deleted > 0
 
@@ -356,5 +350,5 @@ def delete_document(doc_id: str) -> dict:
         "pages_deleted": pages_deleted,
         "interactions_deleted": interactions_deleted,
         "blob_deleted": blob_deleted,
-        "errors": errors
+        "errors": errors,
     }

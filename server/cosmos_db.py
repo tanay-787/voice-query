@@ -1,14 +1,15 @@
-import os
-import time
 import concurrent.futures
+import time
+
 from azure.cosmos import CosmosClient, exceptions
+
 from config import (
+    AZURE_COSMOS_CONTAINER,
+    AZURE_COSMOS_CONTAINER_INTERACTIONS,
+    AZURE_COSMOS_CONTAINER_PAGES,
+    AZURE_COSMOS_DATABASE,
     AZURE_COSMOS_ENDPOINT,
     AZURE_COSMOS_KEY,
-    AZURE_COSMOS_DATABASE,
-    AZURE_COSMOS_CONTAINER,
-    AZURE_COSMOS_CONTAINER_PAGES,
-    AZURE_COSMOS_CONTAINER_INTERACTIONS,
 )
 
 _cosmos_client = None
@@ -16,16 +17,15 @@ _docs_container = None
 _pages_container = None
 _interactions_container = None
 
+
 def get_cosmos_client():
     global _cosmos_client
     if _cosmos_client is None:
         if not AZURE_COSMOS_ENDPOINT or not AZURE_COSMOS_KEY:
             return None
-        _cosmos_client = CosmosClient(
-            url=AZURE_COSMOS_ENDPOINT,
-            credential=AZURE_COSMOS_KEY
-        )
+        _cosmos_client = CosmosClient(url=AZURE_COSMOS_ENDPOINT, credential=AZURE_COSMOS_KEY)
     return _cosmos_client
+
 
 def get_documents_container():
     global _docs_container
@@ -37,6 +37,7 @@ def get_documents_container():
         _docs_container = database.get_container_client(AZURE_COSMOS_CONTAINER)
     return _docs_container
 
+
 def get_pages_container():
     global _pages_container
     if _pages_container is None:
@@ -46,6 +47,7 @@ def get_pages_container():
         database = client.get_database_client(AZURE_COSMOS_DATABASE)
         _pages_container = database.get_container_client(AZURE_COSMOS_CONTAINER_PAGES)
     return _pages_container
+
 
 def get_interactions_container():
     global _interactions_container
@@ -57,12 +59,15 @@ def get_interactions_container():
         _interactions_container = database.get_container_client(AZURE_COSMOS_CONTAINER_INTERACTIONS)
     return _interactions_container
 
+
 def is_cosmos_configured() -> bool:
     return bool(AZURE_COSMOS_ENDPOINT and AZURE_COSMOS_KEY)
+
 
 # ==========================================
 # 1. Documents Container Operations (/id)
 # ==========================================
+
 
 def save_document_cosmos(doc_data: dict) -> dict:
     """
@@ -72,6 +77,7 @@ def save_document_cosmos(doc_data: dict) -> dict:
     if container is None:
         raise RuntimeError("Cosmos DB is not configured.")
     return container.upsert_item(body=doc_data)
+
 
 def get_document_cosmos(doc_id: str) -> dict | None:
     """
@@ -85,6 +91,7 @@ def get_document_cosmos(doc_id: str) -> dict | None:
     except exceptions.CosmosResourceNotFoundError:
         return None
 
+
 def get_document_by_hash_cosmos(file_hash: str) -> dict | None:
     """
     Cross-partition indexed query to check if a document with this SHA-256 hash exists.
@@ -94,15 +101,15 @@ def get_document_by_hash_cosmos(file_hash: str) -> dict | None:
         return None
 
     query = "SELECT * FROM c WHERE c.file_hash = @file_hash"
-    params = [{"name": "@file_hash", "value": file_hash}]
+    params: list[dict[str, object]] = [{"name": "@file_hash", "value": file_hash}]
 
-    items = list(container.query_items(
-        query=query,
-        parameters=params,
-        enable_cross_partition_query=True,
-        max_item_count=1
-    ))
+    items = list(
+        container.query_items(
+            query=query, parameters=params, enable_cross_partition_query=True, max_item_count=1
+        )
+    )
     return items[0] if items else None
+
 
 def count_documents_by_hash_cosmos(file_hash: str) -> int:
     """
@@ -113,14 +120,21 @@ def count_documents_by_hash_cosmos(file_hash: str) -> int:
         return 0
 
     query = "SELECT VALUE COUNT(1) FROM c WHERE c.file_hash = @file_hash"
-    params = [{"name": "@file_hash", "value": file_hash}]
+    params: list[dict[str, object]] = [{"name": "@file_hash", "value": file_hash}]
 
-    items = list(container.query_items(
-        query=query,
-        parameters=params,
-        enable_cross_partition_query=True
-    ))
-    return items[0] if items else 0
+    items = list(
+        container.query_items(query=query, parameters=params, enable_cross_partition_query=True)
+    )
+    if not items:
+        return 0
+    first = items[0]
+    if isinstance(first, (int, float)):
+        return int(first)
+    if isinstance(first, dict):
+        val = first.get("$1", first.get("total", 0))
+        return int(val) if isinstance(val, (int, float, str)) else 0
+    return 0
+
 
 def delete_document_cosmos(doc_id: str) -> bool:
     """
@@ -138,9 +152,11 @@ def delete_document_cosmos(doc_id: str) -> bool:
         print(f"[CosmosDB] Failed to delete document {doc_id}: {e}")
         return False
 
+
 # ==========================================
 # 2. Document Pages Container Operations (/document_id)
 # ==========================================
+
 
 def save_document_pages_cosmos(doc_id: str, pages: list[dict]) -> None:
     """
@@ -165,7 +181,7 @@ def save_document_pages_cosmos(doc_id: str, pages: list[dict]) -> None:
             "document_id": doc_id,
             "page": page_num,
             "text": text,
-            "created_at": now
+            "created_at": now,
         }
         container.upsert_item(body=item)
 
@@ -177,10 +193,9 @@ def save_document_pages_cosmos(doc_id: str, pages: list[dict]) -> None:
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             list(executor.map(_upsert_page, pages))
 
+
 def get_document_pages_cosmos(
-    doc_id: str,
-    start_page: int | None = None,
-    end_page: int | None = None
+    doc_id: str, start_page: int | None = None, end_page: int | None = None
 ) -> list[dict]:
     """
     Performs an intra-partition query to fetch page items for a document.
@@ -190,6 +205,7 @@ def get_document_pages_cosmos(
     if container is None:
         return []
 
+    params: list[dict[str, object]]
     if start_page is not None and end_page is not None:
         query = (
             "SELECT c.id, c.document_id, c.page, c.text FROM c "
@@ -209,11 +225,8 @@ def get_document_pages_cosmos(
         )
         params = [{"name": "@doc_id", "value": doc_id}]
 
-    return list(container.query_items(
-        query=query,
-        parameters=params,
-        partition_key=doc_id
-    ))
+    return list(container.query_items(query=query, parameters=params, partition_key=doc_id))
+
 
 def delete_document_pages_cosmos(doc_id: str) -> int:
     """
@@ -225,12 +238,8 @@ def delete_document_pages_cosmos(doc_id: str) -> int:
         return 0
 
     query = "SELECT c.id FROM c WHERE c.document_id = @doc_id"
-    params = [{"name": "@doc_id", "value": doc_id}]
-    pages = list(container.query_items(
-        query=query,
-        parameters=params,
-        partition_key=doc_id
-    ))
+    params: list[dict[str, object]] = [{"name": "@doc_id", "value": doc_id}]
+    pages = list(container.query_items(query=query, parameters=params, partition_key=doc_id))
 
     if not pages:
         return 0
@@ -250,9 +259,11 @@ def delete_document_pages_cosmos(doc_id: str) -> int:
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         return sum(executor.map(_delete_page_item, pages))
 
+
 # ==========================================
 # 3. Interactions Container Operations (/document_id)
 # ==========================================
+
 
 def save_interaction_cosmos(interaction_data: dict) -> dict:
     """
@@ -265,6 +276,7 @@ def save_interaction_cosmos(interaction_data: dict) -> dict:
 
     return container.upsert_item(body=interaction_data)
 
+
 def get_interactions_cosmos(doc_id: str) -> list[dict]:
     """
     Fetches all interactions for a document in chronological order.
@@ -274,17 +286,11 @@ def get_interactions_cosmos(doc_id: str) -> list[dict]:
     if container is None:
         return []
 
-    query = (
-        "SELECT * FROM c WHERE c.document_id = @doc_id "
-        "ORDER BY c.created_at ASC"
-    )
-    params = [{"name": "@doc_id", "value": doc_id}]
+    query = "SELECT * FROM c WHERE c.document_id = @doc_id ORDER BY c.created_at ASC"
+    params: list[dict[str, object]] = [{"name": "@doc_id", "value": doc_id}]
 
-    return list(container.query_items(
-        query=query,
-        parameters=params,
-        partition_key=doc_id
-    ))
+    return list(container.query_items(query=query, parameters=params, partition_key=doc_id))
+
 
 def delete_interactions_cosmos(doc_id: str) -> int:
     """
@@ -296,12 +302,8 @@ def delete_interactions_cosmos(doc_id: str) -> int:
         return 0
 
     query = "SELECT c.id FROM c WHERE c.document_id = @doc_id"
-    params = [{"name": "@doc_id", "value": doc_id}]
-    items = list(container.query_items(
-        query=query,
-        parameters=params,
-        partition_key=doc_id
-    ))
+    params: list[dict[str, object]] = [{"name": "@doc_id", "value": doc_id}]
+    items = list(container.query_items(query=query, parameters=params, partition_key=doc_id))
 
     if not items:
         return 0

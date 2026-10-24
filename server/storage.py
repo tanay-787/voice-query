@@ -1,14 +1,16 @@
-import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+
 from azure.storage.blob import (
-    BlobServiceClient,
     BlobSasPermissions,
-    generate_blob_sas,
+    BlobServiceClient,
     ContentSettings,
+    generate_blob_sas,
 )
+
 from config import AZURE_STORAGE_CONNECTION_STRING, AZURE_STORAGE_CONTAINER
 
 _blob_service_client = None
+
 
 def get_blob_service_client():
     global _blob_service_client
@@ -20,12 +22,15 @@ def get_blob_service_client():
         )
     return _blob_service_client
 
+
 def get_container_client():
     client = get_blob_service_client()
     return client.get_container_client(AZURE_STORAGE_CONTAINER)
 
+
 def resolve_blob_name(identifier: str) -> str:
     return identifier if identifier.endswith(".pdf") else f"{identifier}.pdf"
+
 
 def upload_document_blob(identifier: str, file_bytes: bytes, filename: str) -> str:
     """
@@ -42,11 +47,11 @@ def upload_document_blob(identifier: str, file_bytes: bytes, filename: str) -> s
             file_bytes,
             overwrite=True,
             content_settings=ContentSettings(
-                content_type="application/pdf",
-                content_disposition=f'inline; filename="{filename}"'
-            )
+                content_type="application/pdf", content_disposition=f'inline; filename="{filename}"'
+            ),
         )
     return blob_client.url
+
 
 def download_document_blob(identifier: str) -> bytes:
     """
@@ -56,6 +61,7 @@ def download_document_blob(identifier: str) -> bytes:
     blob_name = resolve_blob_name(identifier)
     blob_client = container.get_blob_client(blob_name)
     return blob_client.download_blob().readall()
+
 
 def delete_document_blob(identifier: str) -> bool:
     """
@@ -73,6 +79,7 @@ def delete_document_blob(identifier: str) -> bool:
         print(f"[Storage] Failed to delete blob {identifier}: {e}")
         return False
 
+
 def generate_sas_url(identifier: str, expiry_hours: int = 24) -> str:
     """
     Generates a secure temporary SAS URL for direct client reading/downloading.
@@ -82,13 +89,14 @@ def generate_sas_url(identifier: str, expiry_hours: int = 24) -> str:
     blob_client = container.get_blob_client(blob_name)
 
     client = get_blob_service_client()
+    account_name = client.account_name or ""
     sas_token = generate_blob_sas(
-        account_name=client.account_name,
+        account_name=account_name,
         container_name=AZURE_STORAGE_CONTAINER,
         blob_name=blob_name,
         account_key=client.credential.account_key,
         permission=BlobSasPermissions(read=True),
-        expiry=datetime.now(timezone.utc) + timedelta(hours=expiry_hours)
+        expiry=datetime.now(UTC) + timedelta(hours=expiry_hours),
     )
 
     return f"{blob_client.url}?{sas_token}"

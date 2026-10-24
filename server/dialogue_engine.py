@@ -2,10 +2,17 @@ import json
 import re
 import time
 import uuid
-from typing import Generator
+from collections.abc import Generator
+
 from azure.ai.inference import ChatCompletionsClient
-from azure.ai.inference.models import SystemMessage, UserMessage, AssistantMessage
+from azure.ai.inference.models import (
+    AssistantMessage,
+    ChatRequestMessage,
+    SystemMessage,
+    UserMessage,
+)
 from azure.core.credentials import AzureKeyCredential
+
 from config import AZURE_AI_ENDPOINT, AZURE_AI_KEY, AZURE_AI_MODEL
 from cosmos_db import get_document_pages_cosmos, save_interaction_cosmos
 
@@ -30,6 +37,7 @@ EXTRACTED DOCUMENT CONTENT:
 
 _azure_client: ChatCompletionsClient | None = None
 
+
 def get_azure_client() -> ChatCompletionsClient:
     """
     Returns a cached ChatCompletionsClient instance.
@@ -38,15 +46,13 @@ def get_azure_client() -> ChatCompletionsClient:
     global _azure_client
     if _azure_client is None:
         _azure_client = ChatCompletionsClient(
-            endpoint=AZURE_AI_ENDPOINT,
-            credential=AzureKeyCredential(AZURE_AI_KEY)
+            endpoint=AZURE_AI_ENDPOINT, credential=AzureKeyCredential(AZURE_AI_KEY)
         )
     return _azure_client
 
+
 def retrieve_relevant_document_text(
-    doc_id: str,
-    page_count: int,
-    current_page: int | None = None
+    doc_id: str, page_count: int, current_page: int | None = None
 ) -> str:
     """
     Intelligently retrieves page text from document_pages container.
@@ -83,13 +89,14 @@ def retrieve_relevant_document_text(
 
     return "\n\n".join(text_parts)
 
+
 def stream_speech_answer(
     question: str,
     document: dict,
     conversation_history: list[dict] | None = None,
     current_page: int | None = None,
     interaction_id: str | None = None,
-) -> Generator[str, None, None]:
+) -> Generator[str]:
     """
     Stream spoken answer from Azure Foundry gpt-4-1-mini with citation extraction.
     Yields SSE-formatted lines.
@@ -110,10 +117,10 @@ def stream_speech_answer(
         page_count=page_count,
         primary_page=active_page,
         reading_position_hint=reading_hint,
-        document_text=doc_text
+        document_text=doc_text,
     )
 
-    messages = [SystemMessage(content=system_content)]
+    messages: list[ChatRequestMessage] = [SystemMessage(content=system_content)]
 
     # Add conversation history
     if conversation_history:
@@ -129,11 +136,7 @@ def stream_speech_answer(
     messages.append(UserMessage(content=question))
 
     response_stream = client.complete(
-        messages=messages,
-        model=AZURE_AI_MODEL,
-        temperature=0.3,
-        max_tokens=250,
-        stream=True
+        messages=messages, model=AZURE_AI_MODEL, temperature=0.3, max_tokens=250, stream=True
     )
 
     buffer = ""
@@ -149,13 +152,13 @@ def stream_speech_answer(
         # Check for citation tag [PAGE: X]
         if not citation_sent:
             buffer += token
-            page_match = re.search(r'\[PAGE:\s*(\d+)\]', buffer)
+            page_match = re.search(r"\[PAGE:\s*(\d+)\]", buffer)
             if page_match:
                 raw_page = int(page_match.group(1))
                 cited_page = max(1, min(raw_page, page_count))
                 citation_sent = True
                 yield f"event: citation\ndata: {json.dumps({'page': cited_page})}\n\n"
-                clean_text = buffer[page_match.end():]
+                clean_text = buffer[page_match.end() :]
                 buffer = ""
                 if clean_text:
                     full_answer.append(clean_text)
