@@ -9,6 +9,8 @@ import { Feather } from "@expo/vector-icons";
 import { RippleButton } from "@/components/primitives/ripple-button";
 import { EmptyCollectionState } from "@/components/blocks/empty-collection-v1";
 import { PdfCanvas, type PdfCanvasRef } from "@/components/organisms/pdf-canvas";
+import { VoicePill } from "@/components/organisms/voice-pill";
+import { useVoiceSession } from "@/hooks/use-voice-session";
 import { useOnboarding } from "@/context/onboarding-context";
 import { useTheme } from "@/context/theme-context";
 import { useDocumentStore } from "@/store/document-store";
@@ -37,6 +39,16 @@ export default function DocumentCanvasScreen() {
   const activeDoc =
     documents.find((doc) => doc.id === activeDocId) ??
     (documents.length > 0 ? documents[0] : null);
+
+  const targetDocId = activeDoc?.serverDocId || activeDoc?.id || null;
+  const voiceSession = useVoiceSession({
+    docId: targetDocId,
+    currentPage: activeDoc?.currentPage ?? 1,
+    onCitationNavigate: (citedPage) => {
+      console.log(`[DocumentCanvasScreen] Auto-navigating to cited Page ${citedPage}`);
+      pdfCanvasRef.current?.setPage(citedPage);
+    },
+  });
 
   const handlePickDocument = async () => {
     try {
@@ -182,6 +194,7 @@ export default function DocumentCanvasScreen() {
             }}
             onPageChange={(page, total) => {
               updatePageProgress(activeDoc.id, page, total);
+              voiceSession.sendReadingPosition(page);
             }}
           />
 
@@ -208,6 +221,16 @@ export default function DocumentCanvasScreen() {
               </Text>
             </View>
           )}
+
+          {/* Bottom Floating Voice Pill */}
+          <VoicePill
+            status={voiceSession.status}
+            activePage={activeDoc.currentPage}
+            lastCitation={voiceSession.lastCitation}
+            onToggle={voiceSession.toggle}
+            onInterrupt={voiceSession.interrupt}
+            style={[styles.floatingVoicePill, { bottom: insets.bottom + 16 }]}
+          />
         </View>
       ) : (
         <EmptyCollectionState
@@ -294,5 +317,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     letterSpacing: -0.2,
+  },
+  floatingVoicePill: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 20,
   },
 });
