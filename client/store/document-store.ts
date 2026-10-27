@@ -11,7 +11,7 @@ import {
   getActiveDocId,
   setActiveDocId,
 } from "@/db/document-repository";
-import { uploadPdfDocument } from "@/services/api";
+import { checkServerHealth, uploadPdfDocument } from "@/services/api";
 
 export type { DocumentItem };
 
@@ -49,6 +49,11 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
     if (get().isInitialized) return;
     if (initPromise) return initPromise;
 
+    // Run health check diagnostics asynchronously on app init
+    checkServerHealth().catch((err) => {
+      console.warn("[DocumentStore] Initial server health check failed:", err);
+    });
+
     initPromise = (async () => {
       try {
         const storedDocs = await getAllDocuments();
@@ -79,6 +84,7 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
 
   importDocument: async (asset: ImportAssetInput) => {
     set({ isImporting: true });
+    console.log(`[DocumentStore] Importing asset "${asset.name}" (${asset.uri})`);
     try {
       // 1. Ensure sandboxed 'documents' directory exists using the new File System API
       const docsDir = new Directory(Paths.document, "documents");
@@ -135,6 +141,8 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
     const doc = get().documents.find((d) => d.id === id);
     if (!doc || doc.syncStatus === "synced") return;
 
+    console.log(`[DocumentStore] Syncing document "${doc.name}" (${doc.id}) to backend...`);
+
     set((state) => ({
       documents: state.documents.map((d) =>
         d.id === id ? { ...d, syncStatus: "syncing" } : d
@@ -145,6 +153,10 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
       const response = await uploadPdfDocument(doc.uri, doc.id);
       const serverDocId = response.document.id;
       const serverPageCount = response.document.page_count;
+
+      console.log(
+        `[DocumentStore] Document "${doc.name}" (${id}) successfully synced. Server ID: ${serverDocId}, Pages: ${serverPageCount}`
+      );
 
       await updateDocumentSyncStatus(id, "synced", serverDocId);
       if (serverPageCount && serverPageCount > 0) {
