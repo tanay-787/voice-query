@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   useAudioStream,
   setAudioModeAsync,
+  setIsAudioActiveAsync,
   requestRecordingPermissionsAsync,
 } from "expo-audio";
 import {
@@ -23,6 +24,9 @@ export function useVoiceSession({
   onCitationNavigate,
 }: UseVoiceSessionProps) {
   const [status, setStatus] = useState<VoiceSessionStatus>("disconnected");
+  const statusRef = useRef<VoiceSessionStatus>("disconnected");
+  statusRef.current = status;
+
   const [lastCitation, setLastCitation] = useState<{ page: number; quote?: string } | null>(null);
   const [lastTranscript, setLastTranscript] = useState<string | null>(null);
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
@@ -37,14 +41,8 @@ export function useVoiceSession({
   const onCitationNavigateRef = useRef(onCitationNavigate);
   onCitationNavigateRef.current = onCitationNavigate;
 
-  const pcmPlayerRef = useRef<PcmAudioPlayer | null>(null);
-  if (!pcmPlayerRef.current) {
-    pcmPlayerRef.current = new PcmAudioPlayer((playing) => {
-      setIsSpeakingSync(playing);
-    });
-  }
-
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rearmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Setup real-time PCM audio streaming from microphone
   const { stream: audioStream, isStreaming } = useAudioStream({
@@ -52,60 +50,95 @@ export function useVoiceSession({
     channels: 1,
     encoding: "int16",
     onBuffer: (buffer) => {
-      if (clientRef.current && status === "connected") {
-        if (isSpeakingRef.current) {
-          // Feed digital silence while assistant is speaking to prevent acoustic feedback loop
-          const silence = new Uint8Array(buffer.data.byteLength);
-          clientRef.current.sendAudioChunk(silence.buffer);
-        } else {
-          clientRef.current.sendAudioChunk(buffer.data);
-        }
+      if (clientRef.current && statusRef.current === "connected" && !isSpeakingRef.current) {
+        clientRef.current.sendAudioChunk(buffer.data);
       }
     },
   });
 
+  const isStartingRecordingRef = useRef<boolean>(false);
+
+  const startRecording = useCallback(async () => {
+    if (isStartingRecordingRef.current) return;
+    if (statusRef.current !== "connected" && statusRef.current !== "connecting") return;
+    if (isSpeakingRef.current) return;
+    if (audioStream.isStreaming) return;
+
+    isStartingRecordingRef.current = true;
+    try {
+      const perm = await requestRecordingPermissionsAsync();
+      if (!perm.granted) {
+        console.warn("[useVoiceSession] Microphone permission was not granted.");
+        return;
+      }
+
+      await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
+        interruptionMode: "duckOthers",
+        shouldRouteThroughEarpiece: false,
+      });
+      await setIsAudioActiveAsync(true);
+
+      if (!audioStream.isStreaming) {
+        await audioStream.start();
+        console.log("[useVoiceSession] Native 16kHz PCM audio stream active.");
+      }
+    } catch (err) {
+      console.warn("[useVoiceSession] Error starting microphone stream:", err);
+    } finally {
+      isStartingRecordingRef.current = false;
+    }
+  }, [audioStream]);
+
+  const stopRecording = useCallback(() => {
+    if (rearmTimerRef.current) {
+      clearTimeout(rearmTimerRef.current);
+      rearmTimerRef.current = null;
+    }
+    try {
+      if (audioStream.isStreaming) {
+        audioStream.stop();
+        console.log("[useVoiceSession] Native 16kHz PCM audio stream paused/stopped.");
+      }
+    } catch (err) {
+      console.warn("[useVoiceSession] Error stopping microphone stream:", err);
+    }
+  }, [audioStream]);
+
+  const startRecordingRef = useRef(startRecording);
+  startRecordingRef.current = startRecording;
+
+  const stopRecordingRef = useRef(stopRecording);
+  stopRecordingRef.current = stopRecording;
+
+  const pcmPlayerRef = useRef<PcmAudioPlayer | null>(null);
+  if (!pcmPlayerRef.current) {
+    pcmPlayerRef.current = new PcmAudioPlayer((playing) => {
+      setIsSpeakingSync(playing);
+      if (!playing && statusRef.current === "connected") {
+        console.log("[useVoiceSession] Playback completed. Re-arming microphone for next turn...");
+        if (rearmTimerRef.current) {
+          clearTimeout(rearmTimerRef.current);
+        }
+        rearmTimerRef.current = setTimeout(() => {
+          if (statusRef.current === "connected" && !isSpeakingRef.current) {
+            startRecordingRef.current?.();
+          }
+        }, 150);
+      }
+    });
+  }
+
   // Activate microphone hardware when WebSocket session connects
   useEffect(() => {
-    let isCancelled = false;
-
-    async function manageAudioCapture() {
-      if (status === "connected") {
-        try {
-          const perm = await requestRecordingPermissionsAsync();
-          if (!perm.granted) {
-            console.warn("[useVoiceSession] Microphone permission was not granted.");
-            return;
-          }
-
-          await setAudioModeAsync({
-            allowsRecording: true,
-            playsInSilentMode: true,
-            interruptionMode: "duckOthers",
-            shouldRouteThroughEarpiece: false,
-          });
-
-          if (!isCancelled && !audioStream.isStreaming) {
-            await audioStream.start();
-            console.log("[useVoiceSession] Native 16kHz PCM audio stream active.");
-          }
-        } catch (err) {
-          console.error("[useVoiceSession] Error initiating microphone capture:", err);
-        }
-      } else {
-        if (audioStream.isStreaming) {
-          audioStream.stop();
-          console.log("[useVoiceSession] Native audio stream stopped.");
-        }
-        pcmPlayerRef.current?.stop();
-      }
+    if (status === "connected") {
+      startRecordingRef.current?.();
+    } else {
+      stopRecordingRef.current?.();
+      pcmPlayerRef.current?.stop();
     }
-
-    manageAudioCapture();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [status, audioStream]);
+  }, [status]);
 
   // Sync reading position whenever currentPage changes and session is connected
   useEffect(() => {
@@ -127,6 +160,10 @@ export function useVoiceSession({
   // Teardown when docId changes or component unmounts
   useEffect(() => {
     return () => {
+      if (rearmTimerRef.current) {
+        clearTimeout(rearmTimerRef.current);
+        rearmTimerRef.current = null;
+      }
       if (clientRef.current) {
         clientRef.current.disconnect();
         clientRef.current = null;
@@ -147,6 +184,7 @@ export function useVoiceSession({
         setStatus(newStatus);
         if (newStatus !== "connected") {
           setIsSpeakingSync(false);
+          stopRecording();
           pcmPlayerRef.current?.stop();
         }
       },
@@ -158,12 +196,31 @@ export function useVoiceSession({
           setLastTranscript(event.text);
         } else if (event.type === "BOT_STARTED_SPEAKING") {
           setIsSpeakingSync(true);
+          stopRecording();
           pcmPlayerRef.current?.clearBuffer();
         } else if (event.type === "BOT_STOPPED_SPEAKING") {
-          pcmPlayerRef.current?.playBufferedTurn();
+          pcmPlayerRef.current
+            ?.playBufferedTurn()
+            .then((started) => {
+              if (!started) {
+                console.log("[useVoiceSession] No audio was buffered to play. Re-arming microphone.");
+                setIsSpeakingSync(false);
+                startRecording();
+              }
+            })
+            .catch((err) => {
+              console.error("[useVoiceSession] Error playing buffered turn:", err);
+              setIsSpeakingSync(false);
+              startRecording();
+            });
         } else if (event.type === "INTERRUPT") {
+          if (rearmTimerRef.current) {
+            clearTimeout(rearmTimerRef.current);
+            rearmTimerRef.current = null;
+          }
           pcmPlayerRef.current?.stop();
           setIsSpeakingSync(false);
+          startRecording();
         }
       },
       onAudioData: (data: ArrayBuffer) => {
@@ -176,17 +233,22 @@ export function useVoiceSession({
 
     clientRef.current = client;
     client.connect();
-  }, [docId, currentPage, setIsSpeakingSync]);
+  }, [docId, currentPage, setIsSpeakingSync, startRecording, stopRecording]);
 
   const disconnect = useCallback(() => {
+    if (rearmTimerRef.current) {
+      clearTimeout(rearmTimerRef.current);
+      rearmTimerRef.current = null;
+    }
     if (clientRef.current) {
       clientRef.current.disconnect();
       clientRef.current = null;
     }
     pcmPlayerRef.current?.destroy();
+    stopRecording();
     setStatus("disconnected");
     setIsSpeakingSync(false);
-  }, [setIsSpeakingSync]);
+  }, [setIsSpeakingSync, stopRecording]);
 
   const toggle = useCallback(() => {
     if (status === "connected" || status === "connecting") {
@@ -197,10 +259,15 @@ export function useVoiceSession({
   }, [status, connect, disconnect]);
 
   const interrupt = useCallback(() => {
+    if (rearmTimerRef.current) {
+      clearTimeout(rearmTimerRef.current);
+      rearmTimerRef.current = null;
+    }
     clientRef.current?.interrupt();
     pcmPlayerRef.current?.stop();
     setIsSpeakingSync(false);
-  }, [setIsSpeakingSync]);
+    startRecording();
+  }, [setIsSpeakingSync, startRecording]);
 
   const sendReadingPosition = useCallback((page: number) => {
     clientRef.current?.sendReadingPosition(page);

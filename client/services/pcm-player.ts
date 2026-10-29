@@ -1,4 +1,9 @@
-import { createAudioPlayer, type AudioPlayer } from "expo-audio";
+import {
+  createAudioPlayer,
+  setAudioModeAsync,
+  setIsAudioActiveAsync,
+  type AudioPlayer,
+} from "expo-audio";
 import { Paths, File } from "expo-file-system";
 
 export function buildWavHeader(
@@ -47,9 +52,11 @@ export function buildWavHeader(
 export class PcmAudioPlayer {
   private chunks: Uint8Array[] = [];
   private activePlayer: AudioPlayer | null = null;
+  private activeStatusSub: { remove: () => void } | null = null;
   private activeTempFile: File | null = null;
   private onPlaybackStateChange?: (isPlaying: boolean) => void;
   private safetyTimer: ReturnType<typeof setTimeout> | null = null;
+  private isPlaying: boolean = false;
 
   constructor(onPlaybackStateChange?: (isPlaying: boolean) => void) {
     this.onPlaybackStateChange = onPlaybackStateChange;
@@ -64,11 +71,11 @@ export class PcmAudioPlayer {
     if (this.safetyTimer) {
       clearTimeout(this.safetyTimer);
     }
-    this.safetyTimer = setTimeout(() => {
+    this.safetyTimer = setTimeout(async () => {
       console.log(
         `[PcmAudioPlayer] Safety net triggered after 3000ms idle (${this.chunks.length} chunks queued).`
       );
-      this.playBufferedTurn();
+      await this.playBufferedTurn();
     }, 3000);
   }
 
@@ -80,14 +87,18 @@ export class PcmAudioPlayer {
     this.chunks = [];
   }
 
-  public playBufferedTurn(): void {
+  public hasBufferedAudio(): boolean {
+    return this.chunks.length > 0;
+  }
+
+  public async playBufferedTurn(): Promise<boolean> {
     if (this.safetyTimer) {
       clearTimeout(this.safetyTimer);
       this.safetyTimer = null;
     }
 
     if (this.chunks.length === 0) {
-      return;
+      return false;
     }
 
     let totalPcmBytes = 0;
@@ -97,7 +108,7 @@ export class PcmAudioPlayer {
 
     if (totalPcmBytes === 0) {
       this.chunks = [];
-      return;
+      return false;
     }
 
     console.log(
@@ -117,7 +128,20 @@ export class PcmAudioPlayer {
     this.chunks = [];
 
     try {
-      this.stopActivePlayer(); // Clean up previous player without emitting playbackState=false flicker
+      this.stopActivePlayer();
+
+      // Explicitly configure audio session for speaker playback
+      try {
+        await setAudioModeAsync({
+          playsInSilentMode: true,
+          allowsRecording: false,
+          interruptionMode: "duckOthers",
+          shouldRouteThroughEarpiece: false,
+        });
+        await setIsAudioActiveAsync(true);
+      } catch (modeErr) {
+        console.warn("[PcmAudioPlayer] Warning activating audio playback session:", modeErr);
+      }
 
       const filename = `vq_speech_${Date.now()}_${Math.random().toString(36).substring(2, 6)}.wav`;
       const tempFile = new File(Paths.cache, filename);
@@ -128,36 +152,47 @@ export class PcmAudioPlayer {
         `[PcmAudioPlayer] Written WAV file to ${tempFile.uri} (size: ${wavBytes.byteLength} bytes)`
       );
 
-      const player = createAudioPlayer(tempFile.uri);
+      // keepAudioSessionActive prevents expo-audio from scheduling delayed session deactivation
+      const player = createAudioPlayer(tempFile.uri, {
+        keepAudioSessionActive: true,
+      });
       player.volume = 1.0;
       this.activePlayer = player;
 
-      const statusSub = player.addListener("playbackStatusUpdate", (status) => {
+      this.activeStatusSub = player.addListener("playbackStatusUpdate", (status) => {
         if (status.didJustFinish) {
           console.log("[PcmAudioPlayer] Playback completed.");
-          statusSub.remove();
-          this.cleanup();
-          this.onPlaybackStateChange?.(false);
+          this.stop();
         }
       });
 
       player.play();
+      this.isPlaying = true;
       this.onPlaybackStateChange?.(true);
       console.log(`[PcmAudioPlayer] Started playing assistant speech from ${tempFile.uri}`);
+      return true;
     } catch (err) {
       console.error("[PcmAudioPlayer] Failed to play synthesized speech:", err);
-      this.cleanup();
-      this.onPlaybackStateChange?.(false);
+      this.stop();
+      return false;
     }
   }
 
   private stopActivePlayer(): void {
+    if (this.activeStatusSub) {
+      try {
+        this.activeStatusSub.remove();
+      } catch (err) {
+        console.warn("[PcmAudioPlayer] Error removing status sub:", err);
+      }
+      this.activeStatusSub = null;
+    }
     if (this.activePlayer) {
       try {
         this.activePlayer.pause();
         this.activePlayer.remove();
       } catch (err) {
-        console.warn("[PcmAudioPlayer] Error pausing active player:", err);
+        console.warn("[PcmAudioPlayer] Error pausing/removing active player:", err);
       }
       this.activePlayer = null;
     }
@@ -170,7 +205,10 @@ export class PcmAudioPlayer {
       this.safetyTimer = null;
     }
     this.stopActivePlayer();
-    this.onPlaybackStateChange?.(false);
+    if (this.isPlaying) {
+      this.isPlaying = false;
+      this.onPlaybackStateChange?.(false);
+    }
   }
 
   private cleanup(): void {
