@@ -7,9 +7,16 @@ from fastapi import WebSocket
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import (
+    CancelFrame,
+    EndFrame,
+    ErrorFrame,
     Frame,
     InputTransportMessageFrame,
+    InterruptionFrame,
     InterruptionWorkerFrame,
+    LLMFullResponseEndFrame,
+    OutputTransportMessageFrame,
+    TTSStartedFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
@@ -20,11 +27,12 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMUserAggregatorParams,
 )
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
-from pipecat.services.azure.llm import AzureLLMService
 from pipecat.services.azure.stt import AzureSTTService
 from pipecat.services.azure.tts import AzureTTSService
+from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transcriptions.language import Language
 from pipecat.transports.websocket.fastapi import (
+    FastAPIWebsocketOutputTransport,
     FastAPIWebsocketParams,
     FastAPIWebsocketTransport,
 )
@@ -36,6 +44,21 @@ from citation_splitter import CitationSplitterProcessor
 from cosmos_db import get_document_cosmos, save_interaction_cosmos
 from dialogue_engine import SPEECH_SYSTEM_PROMPT, retrieve_relevant_document_text
 from serializer import VoiceQueryFrameSerializer
+
+
+class LineRateFastAPIWebsocketOutputTransport(FastAPIWebsocketOutputTransport):
+    async def _write_audio_sleep(self):
+        # Do not sleep to artificially pace audio playback.
+        # Stream audio chunks at line-rate so the mobile client receives the speech buffer immediately.
+        pass
+
+
+class LineRateFastAPIWebsocketTransport(FastAPIWebsocketTransport):
+    def __init__(self, websocket: WebSocket, params: FastAPIWebsocketParams, **kwargs):
+        super().__init__(websocket, params, **kwargs)
+        self._output = LineRateFastAPIWebsocketOutputTransport(
+            self, self._client, self._params, name=self._output_name
+        )
 
 
 class ControlMessageProcessor(FrameProcessor):
@@ -65,6 +88,48 @@ class ControlMessageProcessor(FrameProcessor):
                     logger.info("[VoiceSession] Client requested interruption.")
                     await self.push_frame(InterruptionWorkerFrame(), FrameDirection.UPSTREAM)
                     return
+
+        await self.push_frame(frame, direction)
+
+
+class SpeechBoundaryNotifier(FrameProcessor):
+    """
+    Tracks assistant speech turns across multi-sentence LLM responses.
+    Emits BOT_STARTED_SPEAKING on the first TTS audio of a turn,
+    and BOT_STOPPED_SPEAKING only when all sentences of the turn have finished
+    (signaled by LLMFullResponseEndFrame).
+    """
+
+    def __init__(self):
+        super().__init__()
+        self._is_turn_speaking = False
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+
+        if isinstance(frame, TTSStartedFrame):
+            if not self._is_turn_speaking:
+                self._is_turn_speaking = True
+                logger.info("[VoiceSession] Assistant turn started -> notifying mobile client.")
+                await self.push_frame(
+                    OutputTransportMessageFrame(message={"type": "BOT_STARTED_SPEAKING"}),
+                    direction,
+                )
+        elif isinstance(frame, (LLMFullResponseEndFrame, EndFrame)) and self._is_turn_speaking:
+            self._is_turn_speaking = False
+            logger.info("[VoiceSession] Assistant turn completed -> notifying mobile client.")
+            await self.push_frame(
+                OutputTransportMessageFrame(message={"type": "BOT_STOPPED_SPEAKING"}),
+                direction,
+            )
+        elif (
+            isinstance(frame, (InterruptionFrame, CancelFrame, ErrorFrame))
+            and self._is_turn_speaking
+        ):
+            self._is_turn_speaking = False
+            logger.info(
+                f"[VoiceSession] Assistant turn cancelled/interrupted ({type(frame).__name__})."
+            )
 
         await self.push_frame(frame, direction)
 
@@ -137,7 +202,7 @@ async def run_voice_session(websocket: WebSocket, doc_id: str, initial_page: int
     control_processor = ControlMessageProcessor(on_page_change=update_reading_page)
 
     # 3. Setup WebSocket transport
-    transport = FastAPIWebsocketTransport(
+    transport = LineRateFastAPIWebsocketTransport(
         websocket=websocket,
         params=FastAPIWebsocketParams(
             audio_in_enabled=True,
@@ -158,10 +223,10 @@ async def run_voice_session(websocket: WebSocket, doc_id: str, initial_page: int
         language=Language.EN_US,
     )
 
-    llm = AzureLLMService(
-        endpoint=config.AZURE_AI_ENDPOINT,
+    llm = OpenAILLMService(
         api_key=config.AZURE_AI_KEY,
-        settings=AzureLLMService.Settings(model=config.AZURE_AI_MODEL),
+        base_url=config.AZURE_AI_ENDPOINT,
+        settings=OpenAILLMService.Settings(model=config.AZURE_AI_MODEL),
     )
 
     tts = AzureTTSService(
@@ -209,6 +274,8 @@ async def run_voice_session(websocket: WebSocket, doc_id: str, initial_page: int
             logger.error(f"[VoiceSession] Failed to persist interaction: {err}")
 
     # 7. Assemble Pipeline
+    speech_notifier = SpeechBoundaryNotifier()
+
     pipeline = Pipeline(
         [
             transport.input(),
@@ -219,6 +286,7 @@ async def run_voice_session(websocket: WebSocket, doc_id: str, initial_page: int
             response_aggregator,
             citation_splitter,
             tts,
+            speech_notifier,
             transport.output(),
             context_aggregator.assistant(),
         ]

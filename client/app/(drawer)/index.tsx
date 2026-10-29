@@ -227,6 +227,8 @@ export default function DocumentCanvasScreen() {
             status={voiceSession.status}
             activePage={activeDoc.currentPage}
             lastCitation={voiceSession.lastCitation}
+            lastTranscript={voiceSession.lastTranscript}
+            isSpeaking={voiceSession.isSpeaking}
             onToggle={voiceSession.toggle}
             onInterrupt={voiceSession.interrupt}
             style={[styles.floatingVoicePill, { bottom: insets.bottom + 16 }]}

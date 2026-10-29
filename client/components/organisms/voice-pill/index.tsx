@@ -11,6 +11,8 @@ export const VoicePill: React.FC<VoicePillProps> = ({
   status,
   activePage = 1,
   lastCitation,
+  lastTranscript,
+  isSpeaking = false,
   onToggle,
   onInterrupt,
   style,
@@ -19,7 +21,7 @@ export const VoicePill: React.FC<VoicePillProps> = ({
 
   return (
     <View style={[styles.wrapper, style]} pointerEvents="box-none">
-      {/* Citation Toast Pill (when AI cites a page) */}
+      {/* Citation or Transcription Toast Pill */}
       {lastCitation ? (
         <View
           style={[
@@ -37,6 +39,26 @@ export const VoicePill: React.FC<VoicePillProps> = ({
             AI cited Page {lastCitation.page}
           </Text>
         </View>
+      ) : lastTranscript ? (
+        <View
+          style={[
+            styles.citationBadge,
+            {
+              backgroundColor: isDark
+                ? "rgba(24, 24, 27, 0.95)"
+                : "rgba(255, 255, 255, 0.95)",
+              borderColor: theme.borderSubtle,
+            },
+          ]}
+        >
+          <Feather name="user" size={12} color={theme.textSecondary} />
+          <Text
+            numberOfLines={1}
+            style={[styles.citationText, { color: theme.textSecondary, maxWidth: 220 }]}
+          >
+            "{lastTranscript}"
+          </Text>
+        </View>
       ) : null}
 
       {/* Main Interactive Voice Pill */}
@@ -48,18 +70,22 @@ export const VoicePill: React.FC<VoicePillProps> = ({
               backgroundColor: isDark
                 ? "rgba(24, 24, 27, 0.92)"
                 : "rgba(255, 255, 255, 0.95)",
-              borderColor: theme.borderSubtle,
+              borderColor: isSpeaking ? theme.actionPrimary : theme.borderSubtle,
             },
           ]}
         >
           <View style={styles.statusDotRow}>
-            <View style={[styles.pulseDot, { backgroundColor: theme.success }]} />
+            {isSpeaking ? (
+              <Feather name="volume-2" size={14} color={theme.actionPrimary} />
+            ) : (
+              <View style={[styles.pulseDot, { backgroundColor: theme.success }]} />
+            )}
             <Text style={[styles.connectedLabel, { color: theme.textPrimary }]}>
-              Voice Live • P.{activePage}
+              {isSpeaking ? `Assistant Speaking` : `Listening • P.${activePage}`}
             </Text>
           </View>
 
-          {onInterrupt && (
+          {isSpeaking && onInterrupt ? (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Interrupt speech"
@@ -68,7 +94,7 @@ export const VoicePill: React.FC<VoicePillProps> = ({
             >
               <Feather name="pause" size={13} color={theme.textPrimary} />
             </Pressable>
-          )}
+          ) : null}
 
           <Pressable
             accessibilityRole="button"

@@ -26,6 +26,14 @@ export interface InterruptEvent {
   type: "INTERRUPT";
 }
 
+export interface BotStartedSpeakingEvent {
+  type: "BOT_STARTED_SPEAKING";
+}
+
+export interface BotStoppedSpeakingEvent {
+  type: "BOT_STOPPED_SPEAKING";
+}
+
 export interface ErrorEvent {
   type: "ERROR";
   message: string;
@@ -36,6 +44,8 @@ export type VoiceSessionEvent =
   | NavigatePageEvent
   | TranscriptionEvent
   | InterruptEvent
+  | BotStartedSpeakingEvent
+  | BotStoppedSpeakingEvent
   | ErrorEvent;
 
 export interface VoiceSessionCallbacks {

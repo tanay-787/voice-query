@@ -5,6 +5,8 @@ export interface VoicePillProps {
   status: VoiceSessionStatus;
   activePage?: number;
   lastCitation?: { page: number; quote?: string } | null;
+  lastTranscript?: string | null;
+  isSpeaking?: boolean;
   onToggle: () => void;
   onInterrupt?: () => void;
   style?: StyleProp<ViewStyle>;
