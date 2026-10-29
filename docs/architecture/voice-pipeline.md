@@ -8,6 +8,8 @@ This document serves as the **Source of Truth (SoT)** for VoiceQuery's real-time
 
 VoiceQuery delivers conversational document intelligence through a full-duplex WebSocket connection between the Expo React Native mobile client and a Pipecat-powered Python backend.
 
+> 🔗 **Interactive Visual**: [Open System Architecture in Lucidchart](https://lucid.app/lucidchart/0ccb41ce-f481-4d55-84b4-8d8dbe782d59/edit?invitationId=inv_2db3434d-93f4-4481-ae48-a8fe3a27f512)
+
 ```mermaid
 flowchart TD
     subgraph MobileClient["Mobile Client (Expo SDK 57)"]
@@ -67,6 +69,8 @@ The WebSocket connection (`ws://<host>:<port>/ws/session/<doc_id>?page=<initial_
 ---
 
 ## 3. Turn-by-Turn Conversational Sequence
+
+> 🔗 **Interactive Visual**: [Open Turn Sequence Diagram in Lucidchart](https://lucid.app/lucidchart/d566f9b8-14f9-4e22-ae14-113b91dae44b/edit?invitationId=inv_62710536-380c-4005-8661-d7d08c4419f7)
 
 ```mermaid
 sequenceDiagram
