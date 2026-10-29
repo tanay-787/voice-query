@@ -59,3 +59,17 @@ Before completing any task or committing changes:
    pnpm exec expo config --type public
    ```
    Must resolve cleanly against the official schema.
+
+---
+
+## 5. Real-Time Voice Pipeline & Audio Invariants
+
+* **Full Architecture Spec**: Read [`docs/architecture/voice-pipeline.md`](docs/architecture/voice-pipeline.md) before modifying voice streaming or audio playback.
+* **WebSocket Multiplexing**:
+  * Binary frames: 16kHz Int16 Mono PCM audio streams (Client Mic $\to$ Server, Server TTS $\to$ Client).
+  * JSON frames: Out-of-band events (`SESSION_READY`, `NAVIGATE_PAGE`, `TRANSCRIPTION`, `BOT_STARTED_SPEAKING`, `BOT_STOPPED_SPEAKING`, `INTERRUPT`, `SET_READING_POSITION`).
+* **iOS Audio Session Invariants (`expo-audio`)**:
+  * **Input silences Output**: `AudioStream` uses `AVAudioSessionCategoryRecord`, which silences all audio playback. Before playing speech via `AVPlayer`, you **must** call `setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false })` and `setIsAudioActiveAsync(true)`.
+  * **Suppress Delayed Deactivation**: Always pass `{ keepAudioSessionActive: true }` to `createAudioPlayer`. Otherwise `expo-audio` deactivates the session 100ms later in a background task, breaking mic re-arming.
+  * **Hardware Teardown Cooldown**: After playback finishes (`status.didJustFinish`), wait **150ms** before calling `audioStream.start()`. Starting `AVAudioEngine` while `AVPlayer` is releasing causes `AVAudioSessionErrorCodeCannotInterruptOthers` (error `560227702`).
+  * **Half-Duplex Turn Taking**: Mic capture is paused on `BOT_STARTED_SPEAKING` to prevent acoustic echo loops. Users interrupt via the `VoicePill` interrupt button.

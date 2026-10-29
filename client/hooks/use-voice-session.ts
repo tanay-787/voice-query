@@ -1,3 +1,21 @@
+/**
+ * useVoiceSession
+ *
+ * Orchestrates the full-duplex real-time conversational voice loop for VoiceQuery:
+ * - Captures 16kHz Int16 Mono PCM audio via expo-audio's useAudioStream.
+ * - Manages bidirectional WebSocket communication via VoiceSessionClient.
+ * - Controls the half-duplex turn-taking state machine (Listening vs Speaking).
+ * - Implements a 150ms CoreAudio teardown buffer when transitioning from speech
+ *   playback back to mic recording to avoid AVAudioSessionErrorCodeCannotInterruptOthers.
+ *
+ * Invariants:
+ * - Half-Duplex: Mic capture is stopped when assistant is speaking (BOT_STARTED_SPEAKING)
+ *   to eliminate acoustic echo feedback.
+ * - Re-Arm Cooldown: 150ms timer allows AVPlayer to detach before AVAudioEngine starts.
+ *
+ * See docs/architecture/voice-pipeline.md for full specification.
+ */
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   useAudioStream,

@@ -1,3 +1,17 @@
+"""
+Real-Time Voice Pipeline for VoiceQuery.
+
+Orchestrates Pipecat's streaming pipeline:
+- Ingests 16kHz Int16 Mono PCM audio over WebSocket (/ws/session/{doc_id}).
+- Silero VAD + Azure Speech STT for voice transcription.
+- OpenAILLMService (Azure AI Foundry endpoint) for document Q&A reasoning.
+- CitationSplitter for live page citation detection and client navigation.
+- Azure Speech TTS for audio synthesis back to the mobile client.
+- VoiceQueryFrameSerializer multiplexes binary PCM frames and JSON control frames.
+
+See docs/architecture/voice-pipeline.md for full specification.
+"""
+
 import json
 import time
 import uuid

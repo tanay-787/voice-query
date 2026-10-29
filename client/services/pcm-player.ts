@@ -1,3 +1,22 @@
+/**
+ * PcmAudioPlayer
+ *
+ * Buffers incoming 16kHz Int16 raw PCM audio chunks streamed from the Pipecat
+ * backend (Azure TTS), packages them into a valid RIFF/WAV container, and plays
+ * them via expo-audio's native AudioPlayer.
+ *
+ * Key iOS AVFoundation Invariants:
+ * 1. Audio Session Flip: expo-audio's AudioStream sets AVAudioSessionCategoryRecord
+ *    which silences playback by definition. Before calling player.play(), this class
+ *    must switch to category .playback and call setIsAudioActiveAsync(true).
+ * 2. Suppress Delayed Deactivation: Passing { keepAudioSessionActive: true } prevents
+ *    expo-audio's native module from deactivating the session 100ms after playback ends.
+ * 3. State Guard: Only emits onPlaybackStateChange(false) when actually transitioning
+ *    from an active playing state to stopped, preventing spurious re-arms.
+ *
+ * See docs/architecture/voice-pipeline.md for full specification.
+ */
+
 import {
   createAudioPlayer,
   setAudioModeAsync,
